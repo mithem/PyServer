@@ -9,17 +9,37 @@ from PyServer.utils import *
 from fileloghelper import Logger
 
 address = ("localhost", 8080)
-logger = Logger()
-_static_sites = []
+name = "PyServer"
+logger = Logger("pyserver.log", "pyserver", False, True)
+logger.header(True, True, "A really simple-to-use HTTP-server", version=True)
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        logger.set_context(name + ": GET")
         parsed_url = parse.urlparse(self.path)
-        content = _sitemap.get_content("GET", parsed_url.path)
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.send_header("Content-Length", len(content))
+        response_code, content, info = _sitemap.get_content(
+            "GET", parsed_url.path)
+        logger.debug(
+            f"\nresponse_code: {response_code}\ninfo: {info}\ncontent: {content}")
+        self.send_response(response_code)
+        for key, value in info.items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(bytes(content, "utf-8"))
+
+    def do_POST(self):
+        logger.set_context(name + ": POST")
+        parsed_url = parse.urlparse(self.path)
+        length = int(self.headers.get("Content-Length", 0))
+        data = str(self.rfile.read(length), "utf-8")
+        response_code, content, info = _sitemap.get_content(
+            "POST", parsed_url.path, data)
+        logger.debug(
+            f"POST\ncode: {response_code}\ninfo: {info}\ncontent: {content}")
+        self.send_response(response_code)
+        for key, value in info.items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(bytes(content, "utf-8"))
 
@@ -32,19 +52,21 @@ class Server:
         """
         self.name = name
         self.description = description
-        self._logger = Logger(self.name + ".log", "pyserver", True, True)
         self.server_address = self._get_server_address(server_address)
         self.webaddress = webaddress
         self.cleanup_function = None
         self._handler: BaseHTTPRequestHandler = Handler
         self._server: HTTPServer = HTTPServer(
             self.server_address, self._handler)
-        self._logger.header(True, True, description)
-        self._logger.success(self.name + " initialized.", False)
+        logger.set_context("startup")
+        logger.success("Server initialized", False)
 
     @classmethod
     def _get_server_address(cls, address):
         """returns tupe[str, int], e.g. ('localhost', 8080)"""
+        hostname = ""
+        port = 0
+
         def valid_hostname(name):
             return bool(re.match(r"^[_a-zA-Z.-]+$", name))
         if type(address) == str:
@@ -75,11 +97,16 @@ class Server:
 
     def run(self):
         try:
+            logger.set_context("startup")
+            logger.success(f"Server started http://{address[0]}:{address[1]}")
             self._server.serve_forever()
         except KeyboardInterrupt:
+            self._server.shutdown()
             self._server.server_close()
             if callable(self.cleanup_function):
                 self.cleanup_function()
+            logger.set_context("shutdown")
+            logger.success("Server stopped.")
 
 
 _server: Server = None
@@ -119,9 +146,12 @@ class Sitemap:
                 "error_page argument expected to a be of subclass 'Site'")
 
     def register_site(self, method: str, site: StaticSite, path=None):
+        logger.set_context("registration")
         method = get_http_method_type(method)
         if issubclass(site.__class__, StaticSite):
             self.methods[method][site.path] = site
+            logger.debug(
+                f"Registered {method.upper()} static site for path '{site.path}'.")
         elif callable(site):
             check_relative_path(path)
             if path[0] != "^":
@@ -129,10 +159,16 @@ class Sitemap:
             if path[-1] != "$":
                 path = path + "$"
             self.methods[method][path] = site
+            logger.debug(
+                f"Registered {method.upper()} function '{site.__name__}' for path '{path}'.")
         else:
             raise TypeError("site argument not a subclass of 'Site'.")
 
-    def get_content(self, method: str, path: str):
+    def get_content(self, method: str, path: str, received_data: str = ""):
+        type_error_msg = "Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[str, dict]."
+        response_code = 500
+        text = ""
+        info = {}
         method = get_http_method_type(method)
         check_relative_path(path)
         site = None
@@ -144,8 +180,45 @@ class Sitemap:
         if isinstance(site, StaticSite):
             content = site.get_content()
         elif callable(site):
-            content = site()
-        return content
+            try:
+                content = site()
+            except TypeError:
+                try:
+                    content = site(received_data)
+                except TypeError as e:
+                    logger.handle_exception(e)
+                    raise TypeError(
+                        f"Function '{site.__name__}' either takes to many arguments (only data: str provided) or raises a TypeError")
+            if type(content) == tuple:
+                print("content < tuple")
+                v1 = False
+                v2 = False
+                if type(content[0]) == str:
+                    v1 = True
+                    if type(content[1]) == dict:
+                        response_code, info = parse_response_info(content[1])
+                        text = content[0]
+                        v2 = True
+                    else:
+                        raise TypeError(type_error_msg)
+                if type(content[0]) == dict:
+                    response_code, info = parse_response_info(content[0])
+                    v1 = True
+                    if type(content[1]) == str:
+                        text = content[1]
+                        v2 = True
+                    else:
+                        raise TypeError(type_error_msg)
+                if not v1 and not v2:
+                    raise ValueError(type_error_msg)
+            elif type(content) == str:
+                response_code, info = guess_response_info(content)
+                print(response_code, info)
+                text = content
+            elif type(content) == dict:
+                info = content
+                text = ""
+        return response_code, text, info
 
 
 _sitemap = Sitemap()
@@ -154,11 +227,18 @@ _sitemap = Sitemap()
 def serves_get(path):
     def my_wrap(func):
         _sitemap.register_site("GET", func, path)
-        logger.debug("registered function: " + func.__name__, True)
         @wraps(func)
         def wrapper(*args, **kwargs):
-            print("function '" + func.__name__ +
-                  "' serves path '" + path + "'.")
+            return func(*args, **kwargs)
+        return wrapper
+    return my_wrap
+
+
+def serves_post(path):
+    def my_wrap(func):
+        _sitemap.register_site("POST", func, path)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
     return my_wrap
@@ -167,12 +247,10 @@ def serves_get(path):
 def static_page(file_path, path):
     check_relative_file_path(file_path)
     check_relative_path(path)
-    _static_sites.append(StaticSite(path, file_path))
+    site = StaticSite(path, file_path)
+    _sitemap.register_site("GET", site)
 
 
 def start():
-    for f in _static_sites:
-        _sitemap.register_site("GET", f)
-
     _server = Server(address)
     _server.run()
