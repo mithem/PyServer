@@ -123,10 +123,13 @@ class StaticSite:
         self.path = path
 
     def get_content(self):
+        content = ""
         if self.path == "^error$" or self.path == "none" or self.file_path == "^error$" or self.file_path == "none":
-            return "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
-        with open(self.file_path, "r") as f:
-            return f.read()
+            content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
+        else:
+            with open(self.file_path, "r") as f:
+                content = f.read()
+        return content
 
 
 class Sitemap:
@@ -178,7 +181,9 @@ class Sitemap:
         if site == None:
             site = self.error_page
         if isinstance(site, StaticSite):
-            content = site.get_content()
+            text = site.get_content()
+            info = {"Content-type": "text/html",
+                    "Content-Length": len(text)}
         elif callable(site):
             try:
                 content = site()
