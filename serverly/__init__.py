@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.1"
+version = "0.0.2"
 _description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -226,6 +226,8 @@ class Sitemap:
             elif type(content) == dict:
                 info = content
                 text = ""
+        text = text.replace(
+            "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
         return response_code, text, info
 
 
@@ -259,6 +261,7 @@ def static_page(file_path, path):
     _sitemap.register_site("GET", site)
 
 
-def start():
+def start(superpath="/"):
+    _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
