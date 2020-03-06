@@ -4,14 +4,16 @@ import importlib
 import urllib.parse as parse
 from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from PyServer.utils import *
+from serverly.utils import *
 
 from fileloghelper import Logger
 
+version = "0.0.1"
+_description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
-logger = Logger("pyserver.log", "pyserver", False, True)
-logger.header(True, True, "A really simple-to-use HTTP-server", version=True)
+logger = Logger("serverly.log", "serverly", False, True)
+logger.header(True, True, _description, version=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -195,25 +197,26 @@ class Sitemap:
                     raise TypeError(
                         f"Function '{site.__name__}' either takes to many arguments (only data: str provided) or raises a TypeError")
             if type(content) == tuple:
-                print("content < tuple")
                 v1 = False
                 v2 = False
                 if type(content[0]) == str:
                     v1 = True
                     if type(content[1]) == dict:
-                        response_code, info = parse_response_info(content[1])
+                        response_code, info = parse_response_info(
+                            content[1], len(content[0]))
                         text = content[0]
                         v2 = True
                     else:
                         raise TypeError(type_error_msg)
                 if type(content[0]) == dict:
-                    response_code, info = parse_response_info(content[0])
-                    v1 = True
                     if type(content[1]) == str:
                         text = content[1]
                         v2 = True
                     else:
                         raise TypeError(type_error_msg)
+                    response_code, info = parse_response_info(
+                        content[0], len(content[1]))
+                    v1 = True
                 if not v1 and not v2:
                     raise ValueError(type_error_msg)
             elif type(content) == str:

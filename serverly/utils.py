@@ -34,9 +34,9 @@ def check_relative_file_path(file_path: str):
             "file_path argument expected to be of type string.")
 
 
-def parse_response_info(info: dict):
+def parse_response_info(info: dict, content_length=0):
     response_code = 200
-    content_length = 0
+    content_length = content_length
     content_type = "text/plain"
     overflow = {}
     for key, value in info.items():

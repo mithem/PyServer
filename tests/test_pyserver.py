@@ -1,5 +1,5 @@
 import pytest
-from PyServer import Server
+from serverly import Server
 
 
 def test_get_server_address():
