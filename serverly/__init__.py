@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.2"
+version = "0.0.3"
 _description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -191,7 +191,11 @@ class Sitemap:
                 content = site()
             except TypeError:
                 try:
-                    content = site(received_data)
+                    try:
+                        data = json.loads(received_data)
+                    except json.JSONDecodeError:
+                        data = received_data
+                    content = site(data)
                 except TypeError as e:
                     logger.handle_exception(e)
                     raise TypeError(
