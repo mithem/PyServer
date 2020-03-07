@@ -9,11 +9,11 @@ from serverly.utils import *
 from fileloghelper import Logger
 
 version = "0.0.8"
-_description = "A really simple-to-use HTTP-server"
+description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
 logger = Logger("serverly.log", "serverly", False, True)
-logger.header(True, True, _description, version=True)
+logger.header(True, True, description, version=True)
 
 
 class Handler(BaseHTTPRequestHandler):
