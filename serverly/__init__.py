@@ -8,12 +8,11 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.6"
-_description = "A really simple-to-use HTTP-server"
+version = "0.0.7"
+description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
-logger = Logger("serverly.log", "serverly", False, True)
-logger.header(True, True, _description, version=True)
+logger: Logger = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -267,6 +266,8 @@ def static_page(file_path, path):
 
 
 def start(superpath="/"):
+    logger = Logger(name + ".log", name, False, True)
+    logger.header(True, True, description, version=True)
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
