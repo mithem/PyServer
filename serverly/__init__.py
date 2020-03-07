@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.5"
+version = "0.0.6"
 _description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
