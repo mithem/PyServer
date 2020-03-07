@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.3"
+version = "0.0.4"
 _description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -170,7 +170,7 @@ class Sitemap:
             raise TypeError("site argument not a subclass of 'Site'.")
 
     def get_content(self, method: str, path: str, received_data: str = ""):
-        type_error_msg = "Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[str, dict]."
+        type_error_msg = "Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[dict, str]."
         response_code = 500
         text = ""
         info = {}
@@ -222,7 +222,8 @@ class Sitemap:
                         content[0], len(content[1]))
                     v1 = True
                 if not v1 and not v2:
-                    raise ValueError(type_error_msg)
+                    raise ValueError(type_error_msg +
+                                     " Response was: " + content)
             elif type(content) == str:
                 response_code, info = guess_response_info(content)
                 print(response_code, info)
