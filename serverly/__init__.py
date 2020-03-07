@@ -170,7 +170,6 @@ class Sitemap:
             raise TypeError("site argument not a subclass of 'Site'.")
 
     def get_content(self, method: str, path: str, received_data: str = ""):
-        type_error_msg = "Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[dict, str]."
         response_code = 500
         text = ""
         info = {}
@@ -187,6 +186,7 @@ class Sitemap:
             info = {"Content-type": "text/html",
                     "Content-Length": len(text)}
         elif callable(site):
+            type_error_msg = f"Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[dict, str]."
             try:
                 content = site()
             except TypeError:
