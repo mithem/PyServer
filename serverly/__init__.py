@@ -12,8 +12,7 @@ version = "0.0.8"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
-logger = Logger("serverly.log", "serverly", False, True)
-logger.header(True, True, description, version=True)
+logger = Logger("serverly.log", "serverly", False, False)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -240,6 +239,20 @@ _sitemap = Sitemap()
 
 
 def serves_get(path):
+    """when using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
+
+    Example(s): 
+
+    return ({'response_code': 200}, 'Hello World!')
+
+    You can also give more headers:
+
+    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
+
+    Or, if you'd like to type as little as you can:
+
+    return {'code':200},'Hello there!'
+    """
     def my_wrap(func):
         _sitemap.register_site("GET", func, path)
         @wraps(func)
@@ -250,6 +263,20 @@ def serves_get(path):
 
 
 def serves_post(path):
+    """when using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
+
+    Example(s): 
+
+    return ({'response_code': 200}, 'Hello World!')
+
+    You can also give more headers:
+
+    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
+
+    Or, if you'd like to type as little as you can:
+
+    return {'code':200},'Hello there!'
+    """
     def my_wrap(func):
         _sitemap.register_site("POST", func, path)
         @wraps(func)
@@ -267,6 +294,8 @@ def static_page(file_path, path):
 
 
 def start(superpath="/"):
+    logger.autosave = True
+    logger.header(True, True, description, version=True)
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
