@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.4"
+version = "0.0.5"
 _description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -223,7 +223,7 @@ class Sitemap:
                     v1 = True
                 if not v1 and not v2:
                     raise ValueError(type_error_msg +
-                                     " Response was: " + content)
+                                     " Response was: " + str(content))
             elif type(content) == str:
                 response_code, info = guess_response_info(content)
                 print(response_code, info)
