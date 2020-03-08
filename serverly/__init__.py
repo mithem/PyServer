@@ -125,7 +125,7 @@ class StaticSite:
 
     def get_content(self):
         content = ""
-        if self.path == "^error$" or self.path == "none" or self.file_path == "^error$" or self.file_path == "none":
+        if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
             content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
         else:
             with open(self.file_path, "r") as f:
@@ -150,7 +150,7 @@ class Sitemap:
             "post": {}
         }
         if error_page == None:
-            self.error_page = StaticSite("error", "none")
+            self.error_page = StaticSite("/error", "none")
         elif issubclass(error_page.__class__, StaticSite):
             self.error_page = error_page
         else:
