@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.9"
+version = "0.0.10"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -62,8 +62,8 @@ class Server:
         logger.set_context("startup")
         logger.success("Server initialized", False)
 
-    @classmethod
-    def _get_server_address(cls, address):
+    @staticmethod
+    def _get_server_address(address):
         """returns tupe[str, int], e.g. ('localhost', 8080)"""
         hostname = ""
         port = 0
@@ -134,7 +134,15 @@ class StaticSite:
 
 
 class Sitemap:
-    def __init__(self, superpath: str = "/", error_page=None):
+    def __init__(self, superpath: str = "/", error_page: StaticSite = None):
+        """
+        Create a new Sitemap instance
+        :param superpath: path which will replace every occurence of '/SUPERPATH/' or 'SUPERPATH/'. Great for accessing multiple servers from one domain and forwarding the requests to this server.
+        :param error_page: default error page
+
+        :type superpath: str
+        :type error_page: StaticPage
+        """
         check_relative_path(superpath)
         self.superpath = superpath
         self.methods = {
@@ -167,6 +175,25 @@ class Sitemap:
                 f"Registered {method.upper()} function '{site.__name__}' for path '{path}'.")
         else:
             raise TypeError("site argument not a subclass of 'Site'.")
+
+    def unregister_site(self, method: str, path: str):
+        method = get_http_method_type(method)
+        check_relative_path(path)
+        if path[0] != "^":
+            path = "^" + path
+        if path[-1] != "$":
+            path = path + "$"
+        found = False
+        for key in self.methods[method].keys():
+            if path == key:
+                found = True  # deleting right here raises RuntimeError
+        if found:
+            del self.methods[method][key]
+            logger.set_context("registration")
+            logger.success(f"Unregistered site/function for path '{path}'")
+        else:
+            logger.warning(
+                f"Site for path '{path}' not found. Cannot be unregistered.")
 
     def get_content(self, method: str, path: str, received_data: str = ""):
         response_code = 500
@@ -287,10 +314,32 @@ def serves_post(path):
 
 
 def static_page(file_path, path):
+    """register static page"""
     check_relative_file_path(file_path)
     check_relative_path(path)
     site = StaticSite(path, file_path)
     _sitemap.register_site("GET", site)
+
+
+def register_get(func, path: str):
+    """register dynamic GET page (function)"""
+    check_relative_path(path)
+    if callable(func):
+        _sitemap.register_site("GET", func, path)
+
+
+def register_post(func, path: str):
+    """register dynamic POST page (function)"""
+    check_relative_path(path)
+    if callable(func):
+        _sitemap.register_site("POST", func, path)
+
+
+def unregister(method: str, path: str):
+    """unregister any page (static or dynamic)."""
+    check_relative_path(path)
+    method = get_http_method_type(method)
+    _sitemap.unregister_site(method, path)
 
 
 def start(superpath="/"):

@@ -4,9 +4,12 @@ import json
 
 def check_relative_path(path: str):
     if type(path) == str:
-        return True
+        if path[0] == "/":
+            return True
+        else:
+            raise ValueError("path doesn't start with '/'.")
     else:
-        raise TypeError("'path' not valid. Expected to be of type string.")
+        raise TypeError("path not valid. Expected to be of type string.")
 
 
 def get_http_method_type(method: str):
