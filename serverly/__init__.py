@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.10"
+version = "0.0.11"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -17,12 +17,12 @@ logger = Logger("serverly.log", "serverly", False, False)
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        logger.set_context(name + ": GET")
         parsed_url = parse.urlparse(self.path)
         response_code, content, info = _sitemap.get_content(
             "GET", parsed_url.path)
+        logger.set_context(name + ": GET")
         logger.debug(
-            f"\nresponse_code: {response_code}\ninfo: {info}\ncontent: {content}")
+            f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
         self.send_response(response_code)
         for key, value in info.items():
             self.send_header(key, value)
@@ -30,14 +30,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(content, "utf-8"))
 
     def do_POST(self):
-        logger.set_context(name + ": POST")
         parsed_url = parse.urlparse(self.path)
         length = int(self.headers.get("Content-Length", 0))
         data = str(self.rfile.read(length), "utf-8")
         response_code, content, info = _sitemap.get_content(
             "POST", parsed_url.path, data)
+        logger.set_context(name + ": POST")
         logger.debug(
-            f"POST\ncode: {response_code}\ninfo: {info}\ncontent: {content}")
+            f"Sent {str(response_code)}, path {parsed_url.path} (POST)")
         self.send_response(response_code)
         for key, value in info.items():
             self.send_header(key, value)
@@ -190,7 +190,8 @@ class Sitemap:
         if found:
             del self.methods[method][key]
             logger.set_context("registration")
-            logger.success(f"Unregistered site/function for path '{path}'")
+            logger.debug(
+                f"Unregistered site/function for path '{path}'")
         else:
             logger.warning(
                 f"Site for path '{path}' not found. Cannot be unregistered.")
