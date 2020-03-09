@@ -8,7 +8,7 @@ from serverly.utils import *
 
 from fileloghelper import Logger
 
-version = "0.0.11"
+version = "0.0.12"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -345,7 +345,8 @@ def unregister(method: str, path: str):
 
 def start(superpath="/"):
     logger.autosave = True
-    logger.header(True, True, description, version=True)
+    logger.header(True, True, description, fileloghelper_version=True,
+                  program_version="serverly v" + version)
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()

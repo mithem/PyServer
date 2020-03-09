@@ -4,10 +4,10 @@ import json
 
 def check_relative_path(path: str):
     if type(path) == str:
-        if path[0] == "/":
+        if path[0] == "/" or (path[0] == "^" and path[1] == "/"):
             return True
         else:
-            raise ValueError("path doesn't start with '/'.")
+            raise ValueError(f"'{path}' (as a path) doesn't start with '/'.")
     else:
         raise TypeError("path not valid. Expected to be of type string.")
 
