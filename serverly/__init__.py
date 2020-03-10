@@ -1,12 +1,50 @@
-import re
-import warnings
+"""
+serverly - http.server wrapper and helper
+--
+
+
+Attributes
+--
+`address: tuple = ('localhost', 8080)` The address used to register the server. Needs to be set before running start()
+
+`name: str = 'PyServer'` The name of the server. Used for logging purposes only.
+
+`logger: fileloghelper.Logger = Logger()` The logger used for logging (surprise!!). See the docs of fileloghelper for reference.
+
+
+Methods
+--
+`static_page(file_path, path)` register a static page while the file is located under `file_path` and will serve `path`
+
+`register_get(func, path: str)` register dynamic GET page (function)
+
+`register_post(func, path: str)` register dynamic POST page (function)
+
+`unregister(method: str, path: str)`unregister any page (static or dynamic). Only affect the `method`-path (GET / POST)
+
+`start(superpath: str="/")` start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers.
+
+
+Decorators (technically methods)
+--
+`serves_get(path: str`/`serves_post(path: str)` Register the function to serve a specific path.
+Example:
+```
+@serves_get("/hello(world)?")
+def hello_world(data):
+    return {"response_code": 200, "Content-type": "text/plain"}, "Hello world!"
+```
+This will return "Hello World!" with a status code of 200, as plain text to the client
+"""
 import importlib
+import re
 import urllib.parse as parse
+import warnings
 from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from serverly.utils import *
 
 from fileloghelper import Logger
+from serverly.utils import *
 
 version = "0.0.12"
 description = "A really simple-to-use HTTP-server"
@@ -99,7 +137,8 @@ class Server:
     def run(self):
         try:
             logger.set_context("startup")
-            logger.success(f"Server started http://{address[0]}:{address[1]}")
+            logger.success(
+                f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
             self._server.serve_forever()
         except KeyboardInterrupt:
             self._server.shutdown()
@@ -266,8 +305,8 @@ class Sitemap:
 _sitemap = Sitemap()
 
 
-def serves_get(path):
-    """when using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
+def serves_get(path: str):
+    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
 
     Example(s): 
 
@@ -290,8 +329,8 @@ def serves_get(path):
     return my_wrap
 
 
-def serves_post(path):
-    """when using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
+def serves_post(path: str):
+    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
 
     Example(s): 
 
@@ -315,7 +354,7 @@ def serves_post(path):
 
 
 def static_page(file_path, path):
-    """register static page"""
+    """Register a static page while the file is located under `file_path` and will serve `path`"""
     check_relative_file_path(file_path)
     check_relative_path(path)
     site = StaticSite(path, file_path)
@@ -323,27 +362,28 @@ def static_page(file_path, path):
 
 
 def register_get(func, path: str):
-    """register dynamic GET page (function)"""
+    """Register dynamic GET page (function)"""
     check_relative_path(path)
     if callable(func):
         _sitemap.register_site("GET", func, path)
 
 
 def register_post(func, path: str):
-    """register dynamic POST page (function)"""
+    """Register dynamic POST page (function)"""
     check_relative_path(path)
     if callable(func):
         _sitemap.register_site("POST", func, path)
 
 
 def unregister(method: str, path: str):
-    """unregister any page (static or dynamic)."""
+    """Unregister any page (static or dynamic). Only affect the `method`-path (GET / POST)"""
     check_relative_path(path)
     method = get_http_method_type(method)
     _sitemap.unregister_site(method, path)
 
 
-def start(superpath="/"):
+def start(superpath: str = "/"):
+    """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     logger.autosave = True
     logger.header(True, True, description, fileloghelper_version=True,
                   program_version="serverly v" + version)
