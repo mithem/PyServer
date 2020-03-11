@@ -47,7 +47,7 @@ from fileloghelper import Logger
 from serverly import default_sites
 from serverly.utils import *
 
-version = "0.0.13"
+version = "0.0.14"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -296,8 +296,8 @@ class Sitemap:
             elif type(content) == dict:
                 info = content
                 text = ""
-            text = text.replace(
-                "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+        text = text.replace(
+            "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
         return info, text
 
     def get_content(self, method: str, path: str, received_data: str = ""):
