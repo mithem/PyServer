@@ -44,9 +44,10 @@ from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from fileloghelper import Logger
+from serverly import default_sites
 from serverly.utils import *
 
-version = "0.0.12"
+version = "0.0.13"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -173,7 +174,7 @@ class StaticSite:
 
 
 class Sitemap:
-    def __init__(self, superpath: str = "/", error_page: StaticSite = None):
+    def __init__(self, superpath: str = "/", error_page: dict = None):
         """
         Create a new Sitemap instance
         :param superpath: path which will replace every occurence of '/SUPERPATH/' or 'SUPERPATH/'. Great for accessing multiple servers from one domain and forwarding the requests to this server.
@@ -189,12 +190,21 @@ class Sitemap:
             "post": {}
         }
         if error_page == None:
-            self.error_page = StaticSite("/error", "none")
+            self.error_page = {0: StaticSite(
+                "/error", "none"), 404: default_sites.page_not_found_error, 500: default_sites.general_server_error}
         elif issubclass(error_page.__class__, StaticSite):
-            self.error_page = error_page
+            self.error_page = {0: error_page}
+        elif type(error_page) == dict:
+            for key, value in error_page.items():
+                if type(key) != int:
+                    raise TypeError(
+                        "error_page: dict keys not of type int (are used as response_codes)")
+                if not issubclass(error_page.__class__, StaticSite) and not callable(error_page):
+                    raise TypeError(
+                        "error_page is neither a StaticSite nor a function.")
         else:
             raise Exception(
-                "error_page argument expected to a be of subclass 'Site'")
+                "error_page argument expected to of type dict[int, Site], or a subclass of 'StaticSite'")
 
     def register_site(self, method: str, site: StaticSite, path=None):
         logger.set_context("registration")
@@ -235,18 +245,7 @@ class Sitemap:
             logger.warning(
                 f"Site for path '{path}' not found. Cannot be unregistered.")
 
-    def get_content(self, method: str, path: str, received_data: str = ""):
-        response_code = 500
-        text = ""
-        info = {}
-        method = get_http_method_type(method)
-        check_relative_path(path)
-        site = None
-        for pattern in self.methods[method]:
-            if re.match(pattern, path):
-                site = self.methods[method][pattern]
-        if site == None:
-            site = self.error_page
+    def get_func_or_site_response(self, site, received_data: str):
         if isinstance(site, StaticSite):
             text = site.get_content()
             info = {"Content-type": "text/html",
@@ -297,8 +296,29 @@ class Sitemap:
             elif type(content) == dict:
                 info = content
                 text = ""
-        text = text.replace(
-            "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+            text = text.replace(
+                "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+        return info, text
+
+    def get_content(self, method: str, path: str, received_data: str = ""):
+        response_code = 500
+        text = ""
+        info = {}
+        method = get_http_method_type(method)
+        check_relative_path(path)
+        site = None
+        for pattern in self.methods[method]:
+            if re.match(pattern, path):
+                site = self.methods[method][pattern]
+        if site == None:
+            response_code = 404
+            site = self.error_page.get(404, self.error_page[0])
+        try:
+            info, text = self.get_func_or_site_response(site, received_data)
+        except Exception as e:
+            logger.handle_exception(e)
+            site = self.error_page.get(500, self.error_page[0])
+            info, text = self.get_func_or_site_response(site, "")
         return response_code, text, info
 
 
