@@ -47,7 +47,7 @@ from fileloghelper import Logger
 from serverly import default_sites
 from serverly.utils import *
 
-version = "0.0.14"
+version = "0.0.16"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -62,9 +62,11 @@ class Handler(BaseHTTPRequestHandler):
         logger.set_context(name + ": GET")
         logger.debug(
             f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
+        print(response_code, info)
         self.send_response(response_code)
-        for key, value in info.items():
-            self.send_header(key, value)
+        for key in info:
+            self.send_header(key, info[key])
+            logger.debug(str(key) + "   " + str(info[key]))
         self.end_headers()
         self.wfile.write(bytes(content, "utf-8"))
 
@@ -246,6 +248,7 @@ class Sitemap:
                 f"Site for path '{path}' not found. Cannot be unregistered.")
 
     def get_func_or_site_response(self, site, received_data: str):
+        response_code = 200
         if isinstance(site, StaticSite):
             text = site.get_content()
             info = {"Content-type": "text/html",
@@ -265,6 +268,8 @@ class Sitemap:
                     logger.handle_exception(e)
                     raise TypeError(
                         f"Function '{site.__name__}' either takes to many arguments (only data: str provided) or raises a TypeError")
+                except Exception as e:
+                    logger.handle_exception(e)
             if type(content) == tuple:
                 v1 = False
                 v2 = False
@@ -298,7 +303,7 @@ class Sitemap:
                 text = ""
         text = text.replace(
             "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
-        return info, text
+        return response_code, info, text
 
     def get_content(self, method: str, path: str, received_data: str = ""):
         response_code = 500
@@ -314,11 +319,14 @@ class Sitemap:
             response_code = 404
             site = self.error_page.get(404, self.error_page[0])
         try:
-            info, text = self.get_func_or_site_response(site, received_data)
+            response_code, info, text = self.get_func_or_site_response(
+                site, received_data)
         except Exception as e:
             logger.handle_exception(e)
             site = self.error_page.get(500, self.error_page[0])
-            info, text = self.get_func_or_site_response(site, "")
+            response_code, info, text = self.get_func_or_site_response(
+                site, "")
+            raise e
         return response_code, text, info
 
 

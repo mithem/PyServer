@@ -57,7 +57,7 @@ def parse_response_info(info: dict, content_length=0):
 
 
 def guess_response_info(content: str):
-    if content.startswith("<DOCTYPE html>") or content.startswith("<html"):
+    if content.startswith("<!DOCTYPE html>") or content.startswith("<html"):
         c_type = "text/html"
     else:
         try:
