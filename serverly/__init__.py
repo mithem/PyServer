@@ -46,8 +46,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from fileloghelper import Logger
 from serverly import default_sites
 from serverly.utils import *
+import serverly.stater
 
-version = "0.0.16"
+version = "0.1.0"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -142,8 +143,10 @@ class Server:
             logger.set_context("startup")
             logger.success(
                 f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
+            serverly.stater.set(0)
             self._server.serve_forever()
         except KeyboardInterrupt:
+            serverly.stater.set(3)
             self._server.shutdown()
             self._server.server_close()
             if callable(self.cleanup_function):
