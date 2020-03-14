@@ -48,7 +48,7 @@ from serverly import default_sites
 from serverly.utils import *
 import serverly.stater
 
-version = "0.1.0"
+version = "0.1.1"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"

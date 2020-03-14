@@ -1,5 +1,5 @@
 """Implementation of stater allows you to easily create an overview on which servers are currently running"""
-import stater
+import stater as st
 
 server_name: str = None
 server_password: str = None
@@ -10,13 +10,16 @@ def set(status_code: int):
     if type(status_code) != int:
         raise TypeError("status_code expected to be of type int.")
     if server_name != None and server_password != None and component_name != None:
-        stater.server_name = server_name
-        stater.server_password = server_password
-        stater.update_component(component_name, status_code)
+        st.server_name = server_name
+        st.server_password = server_password
+        st.update_component(component_name, status_code)
 
 
 def setup(servername: str, serverpassword: str, componentname: str):
     """assign all required variabled"""
+    global server_name
+    global server_password
+    global component_name
     if type(servername) == str:
         server_name = servername
     else:
