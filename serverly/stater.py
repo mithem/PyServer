@@ -1,9 +1,12 @@
 """Implementation of stater allows you to easily create an overview on which servers are currently running"""
 import stater as st
+import datetime
 
 server_name: str = None
 server_password: str = None
 component_name: str = None
+_errors = []
+error_threshold = 60  # minutes
 
 
 def set(status_code: int):
@@ -15,11 +18,12 @@ def set(status_code: int):
         st.update_component(component_name, status_code)
 
 
-def setup(servername: str, serverpassword: str, componentname: str):
+def setup(servername: str, serverpassword: str, componentname: str, errorthreshold=60):
     """assign all required variabled"""
     global server_name
     global server_password
     global component_name
+    global error_threshold
     if type(servername) == str:
         server_name = servername
     else:
@@ -32,3 +36,26 @@ def setup(servername: str, serverpassword: str, componentname: str):
         component_name = componentname
     else:
         raise TypeError("componentname expected to be of type str.")
+    if type(errorthreshold) == int:
+        error_threshold = errorthreshold
+    else:
+        raise TypeError("errorthreshold expected to be of type str.")
+
+
+def error():
+    global _errors
+    global error_treshold
+    print(_errors)
+    try:
+        now = datetime.datetime.now()
+        _errors.append(now.isoformat())
+        old = datetime.datetime.fromisoformat(_errors[-2])
+        new = now - datetime.timedelta(minutes=error_threshold)
+        print(new, old)
+        if new < old:
+            stage = 2
+        else:
+            stage = 1
+    except IndexError:
+        stage = 1
+    set(stage)

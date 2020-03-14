@@ -48,7 +48,7 @@ from serverly import default_sites
 from serverly.utils import *
 import serverly.stater
 
-version = "0.1.1"
+version = "0.1.2"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -57,19 +57,24 @@ logger = Logger("serverly.log", "serverly", False, False)
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        parsed_url = parse.urlparse(self.path)
-        response_code, content, info = _sitemap.get_content(
-            "GET", parsed_url.path)
-        logger.set_context(name + ": GET")
-        logger.debug(
-            f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
-        print(response_code, info)
-        self.send_response(response_code)
-        for key in info:
-            self.send_header(key, info[key])
-            logger.debug(str(key) + "   " + str(info[key]))
-        self.end_headers()
-        self.wfile.write(bytes(content, "utf-8"))
+        try:
+            parsed_url = parse.urlparse(self.path)
+            response_code, content, info = _sitemap.get_content(
+                "GET", parsed_url.path)
+            logger.set_context(name + ": GET")
+            logger.debug(
+                f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
+            print(response_code, info)
+            self.send_response(response_code)
+            for key in info:
+                self.send_header(key, info[key])
+                logger.debug(str(key) + "   " + str(info[key]))
+            self.end_headers()
+            self.wfile.write(bytes(content, "utf-8"))
+        except Exception as e:
+            serverly.stater.error()
+            logger.handle_exception(e)
+            raise e
 
     def do_POST(self):
         parsed_url = parse.urlparse(self.path)
@@ -273,6 +278,12 @@ class Sitemap:
                         f"Function '{site.__name__}' either takes to many arguments (only data: str provided) or raises a TypeError")
                 except Exception as e:
                     logger.handle_exception(e)
+                    content = "500 - Internal server error"
+                    raise e
+            except Exception as e:
+                logger.handle_exception(e)
+                content = "500 - Internal server error"
+                raise e
             if type(content) == tuple:
                 v1 = False
                 v2 = False
@@ -329,7 +340,7 @@ class Sitemap:
             site = self.error_page.get(500, self.error_page[0])
             response_code, info, text = self.get_func_or_site_response(
                 site, "")
-            raise e
+            serverly.stater.error()
         return response_code, text, info
 
 
