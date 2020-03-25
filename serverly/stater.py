@@ -15,7 +15,11 @@ def set(status_code: int):
     if server_name != None and server_password != None and component_name != None:
         st.server_name = server_name
         st.server_password = server_password
-        st.update_component(component_name, status_code)
+        try:
+            st.update_component(component_name, status_code)
+        except st.ConnectionTimeout:
+            raise Warning(
+                "Connection timeout to stater server. Cannot update status.")
 
 
 def setup(servername: str, serverpassword: str, componentname: str, errorthreshold=60):

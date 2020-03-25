@@ -48,7 +48,7 @@ from serverly import default_sites
 from serverly.utils import *
 import serverly.stater
 
-version = "0.1.2"
+version = "0.1.3"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -145,18 +145,25 @@ class Server:
 
     def run(self):
         try:
+            try:
+                serverly.stater.set(0)
+            except Exception as e:
+                logger.handle_exception(e)
             logger.set_context("startup")
             logger.success(
                 f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
-            serverly.stater.set(0)
             self._server.serve_forever()
         except KeyboardInterrupt:
-            serverly.stater.set(3)
+            logger.set_context("shutdown")
+            logger.debug("Shutting down server…", True)
+            try:
+                serverly.stater.set(3)
+            except Exception as e:
+                logger.handle_exception(e)
             self._server.shutdown()
             self._server.server_close()
             if callable(self.cleanup_function):
                 self.cleanup_function()
-            logger.set_context("shutdown")
             logger.success("Server stopped.")
 
 
