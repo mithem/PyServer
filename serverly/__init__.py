@@ -48,11 +48,13 @@ from serverly import default_sites
 from serverly.utils import *
 import serverly.stater
 
-version = "0.1.3"
+version = "0.1.4"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
 logger = Logger("serverly.log", "serverly", False, False)
+logger.header(True, True, description, fileloghelper_version=True,
+              program_version="serverly v" + version)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -434,8 +436,6 @@ def unregister(method: str, path: str):
 def start(superpath: str = "/"):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     logger.autosave = True
-    logger.header(True, True, description, fileloghelper_version=True,
-                  program_version="serverly v" + version)
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
