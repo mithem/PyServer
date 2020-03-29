@@ -48,7 +48,7 @@ from serverly import default_sites
 from serverly.utils import *
 import serverly.stater
 
-version = "0.1.4"
+version = "0.1.5"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "PyServer"
@@ -63,7 +63,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             response_code, content, info = _sitemap.get_content(
                 "GET", parsed_url.path)
-            logger.set_context(name + ": GET")
+            logger.context = name + ": GET"
             logger.debug(
                 f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
             print(response_code, info)
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
         data = str(self.rfile.read(length), "utf-8")
         response_code, content, info = _sitemap.get_content(
             "POST", parsed_url.path, data)
-        logger.set_context(name + ": POST")
+        logger.context = name + ": POST"
         logger.debug(
             f"Sent {str(response_code)}, path {parsed_url.path} (POST)")
         self.send_response(response_code)
@@ -108,7 +108,7 @@ class Server:
         self._handler: BaseHTTPRequestHandler = Handler
         self._server: HTTPServer = HTTPServer(
             self.server_address, self._handler)
-        logger.set_context("startup")
+        logger.context = "startup"
         logger.success("Server initialized", False)
 
     @staticmethod
@@ -151,12 +151,12 @@ class Server:
                 serverly.stater.set(0)
             except Exception as e:
                 logger.handle_exception(e)
-            logger.set_context("startup")
+            logger.context = "startup"
             logger.success(
                 f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
             self._server.serve_forever()
         except KeyboardInterrupt:
-            logger.set_context("shutdown")
+            logger.context = "shutdown"
             logger.debug("Shutting down server…", True)
             try:
                 serverly.stater.set(3)
@@ -226,7 +226,7 @@ class Sitemap:
                 "error_page argument expected to of type dict[int, Site], or a subclass of 'StaticSite'")
 
     def register_site(self, method: str, site: StaticSite, path=None):
-        logger.set_context("registration")
+        logger.context = "registration"
         method = get_http_method_type(method)
         if issubclass(site.__class__, StaticSite):
             self.methods[method][site.path] = site
@@ -257,7 +257,7 @@ class Sitemap:
                 found = True  # deleting right here raises RuntimeError
         if found:
             del self.methods[method][key]
-            logger.set_context("registration")
+            logger.context = "registration"
             logger.debug(
                 f"Unregistered site/function for path '{path}'")
         else:
@@ -359,7 +359,7 @@ _sitemap = Sitemap()
 def serves_get(path: str):
     """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
 
-    Example(s): 
+    Example(s):
 
     return ({'response_code': 200}, 'Hello World!')
 
@@ -383,7 +383,7 @@ def serves_get(path: str):
 def serves_post(path: str):
     """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
 
-    Example(s): 
+    Example(s):
 
     return ({'response_code': 200}, 'Hello World!')
 
