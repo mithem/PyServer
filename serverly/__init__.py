@@ -42,11 +42,12 @@ import urllib.parse as parse
 import warnings
 from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Union
 
+import serverly.stater
 from fileloghelper import Logger
 from serverly import default_sites
 from serverly.utils import *
-import serverly.stater
 
 version = "0.1.5"
 description = "A really simple-to-use HTTP-server"
@@ -71,9 +72,9 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-
-            response_code, content, headers = _sitemap.get_content(
-                "GET", parsed_url.path)
+            request = Request("GET", parsed_url.path, dict(
+                self.headers), received_data, self.client_address)
+            response_code, content, headers = _sitemap.get_content(request)
             logger.context = name + ": GET"
             logger.debug(
                 f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
@@ -133,6 +134,23 @@ class Handler(BaseHTTPRequestHandler):
             serverly.stater.error()
             logger.handle_exception(e)
             raise e
+
+
+class Request:
+    """This is passed along to registered functions as a representation of what the client requested."""
+
+    def __init__(self, method: str, path: str, headers: dict, data: Union[str, dict], address: tuple):
+        self.method = get_http_method_type(method)
+        self.path = path
+        self.headers = headers
+        try:
+            self.body = json.loads(data)
+        except json.JSONDecodeError:
+            self.body = data
+        self.address = address
+
+    def __str__(self):
+        return f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"
 
 
 class Server:
@@ -307,27 +325,26 @@ class Sitemap:
             logger.warning(
                 f"Site for path '{path}' not found. Cannot be unregistered.")
 
-    def get_func_or_site_response(self, site, received_data: str):
+    def get_func_or_site_response(self, site, request: Request):
         response_code = 200
         if isinstance(site, StaticSite):
             text = site.get_content()
-            info = {"Content-type": "text/html",
+            filetype = guess_filetype_on_filename(site.file_path)
+            info = {"Content-type": filetype,
                     "Content-Length": len(text)}
+            print("*"*20, "Site to use", "*"*20)
+            print(site.path, site.file_path)
         elif callable(site):
             type_error_msg = f"Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[dict, str]."
             try:
-                content = site()
+                content = site(request)
             except TypeError:
                 try:
-                    try:
-                        data = json.loads(received_data)
-                    except json.JSONDecodeError:
-                        data = received_data
-                    content = site(data)
+                    content = site()
                 except TypeError as e:
                     logger.handle_exception(e)
                     raise TypeError(
-                        f"Function '{site.__name__}' either takes to many arguments (only data: str provided) or raises a TypeError")
+                        f"Function '{site.__name__}' either takes to many arguments (only object of type Request provided) or raises a TypeError")
                 except Exception as e:
                     logger.handle_exception(e)
                     content = "500 - Internal server error"
@@ -371,22 +388,20 @@ class Sitemap:
             "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
         return response_code, info, text
 
-    def get_content(self, method: str, path: str, received_data: str = ""):
+    def get_content(self, request: Request):
         response_code = 500
         text = ""
         info = {}
-        method = get_http_method_type(method)
-        check_relative_path(path)
         site = None
-        for pattern in self.methods[method]:
-            if re.match(pattern, path):
-                site = self.methods[method][pattern]
+        for pattern in self.methods[request.method]:
+            if re.match(pattern, request.path):
+                site = self.methods[request.method][pattern]
         if site == None:
             response_code = 404
             site = self.error_page.get(404, self.error_page[0])
         try:
             response_code, info, text = self.get_func_or_site_response(
-                site, received_data)
+                site, request)
         except Exception as e:
             logger.handle_exception(e)
             site = self.error_page.get(500, self.error_page[0])

@@ -55,6 +55,11 @@ def parse_response_info(info: dict, content_length=0):
     return response_code, info
 
 
+def guess_filetype_on_filename(filename):
+    if filename[-4:] == ".ico":
+        return "image/x-icon"
+
+
 def guess_response_info(content: str):
     if content.startswith("<!DOCTYPE html>") or content.startswith("<html"):
         c_type = "text/html"
