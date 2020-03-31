@@ -7,3 +7,5 @@ run.py
 serverly.egg-info/
 dist/
 build/
+.coverage
+cov.xml

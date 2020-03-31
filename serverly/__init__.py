@@ -51,47 +51,88 @@ import serverly.stater
 version = "0.1.5"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
-name = "PyServer"
+name = "Serverly"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
 
 
 class Handler(BaseHTTPRequestHandler):
+
+    def respond(self, code, headers, content):
+        self.send_response(code)
+        for key, value in headers.items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(bytes(content, "utf-8"))
+
     def do_GET(self):
         try:
             parsed_url = parse.urlparse(self.path)
-            response_code, content, info = _sitemap.get_content(
+            data_length = int(self.headers.get("Content-Length", 0))
+            received_data = str(self.rfile.read(data_length), "utf-8")
+
+            response_code, content, headers = _sitemap.get_content(
                 "GET", parsed_url.path)
             logger.context = name + ": GET"
             logger.debug(
                 f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
-            print(response_code, info)
-            self.send_response(response_code)
-            for key in info:
-                self.send_header(key, info[key])
-                logger.debug(str(key) + "   " + str(info[key]))
-            self.end_headers()
-            self.wfile.write(bytes(content, "utf-8"))
+            self.respond(response_code, headers, content)
         except Exception as e:
             serverly.stater.error()
             logger.handle_exception(e)
             raise e
 
     def do_POST(self):
-        parsed_url = parse.urlparse(self.path)
-        length = int(self.headers.get("Content-Length", 0))
-        data = str(self.rfile.read(length), "utf-8")
-        response_code, content, info = _sitemap.get_content(
-            "POST", parsed_url.path, data)
-        logger.context = name + ": POST"
-        logger.debug(
-            f"Sent {str(response_code)}, path {parsed_url.path} (POST)")
-        self.send_response(response_code)
-        for key, value in info.items():
-            self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(bytes(content, "utf-8"))
+        try:
+            parsed_url = parse.urlparse(self.path)
+            data_length = int(self.headers.get("Content-Length", 0))
+            received_data = str(self.rfile.read(data_length), "utf-8")
+
+            response_code, content, headers = _sitemap.get_content(
+                "POST", parsed_url.path, received_data)
+            self.respond(response_code, headers, content)
+            logger.context = name + ": POST"
+            logger.debug(
+                f"Sent {str(response_code)}, path {parsed_url.path} (POST)")
+        except Exception as e:
+            serverly.stater.error()
+            logger.handle_exception(e)
+            raise e
+
+    def do_PUT(self):
+        try:
+            parsed_url = parse.urlparse(self.path)
+            data_length = int(self.headers.get("Content-Length", 0))
+            received_data = str(self.rfile.read(data_length), "utf-8")
+
+            response_code, content, headers = _sitemap.get_content(
+                "PUT", parsed_url.path, received_data)
+            self.respond(response_code, headers, content)
+            logger.context = name + ": PUT"
+            logger.debug(
+                f"Sent {str(response_code)}, path {parsed_url.path} (PUT)")
+        except Exception as e:
+            serverly.stater.error()
+            logger.handle_exception(e)
+            raise e
+
+    def do_DELETE(self):
+        try:
+            parsed_url = parse.urlparse(self.path)
+            data_length = int(self.headers.get("Content-Length", 0))
+            received_data = str(self.rfile.read(data_length), "utf-8")
+
+            response_code, content, headers = _sitemap.get_content(
+                "DELETE", parsed_url.path, received_data)
+            self.respond(response_code, headers, content)
+            logger.context = name + ": DELETE"
+            logger.debug(
+                f"Sent {str(response_code)}, path {parsed_url.path} (DELETE)")
+        except Exception as e:
+            serverly.stater.error()
+            logger.handle_exception(e)
+            raise e
 
 
 class Server:
@@ -206,7 +247,9 @@ class Sitemap:
         self.superpath = superpath
         self.methods = {
             "get": {},
-            "post": {}
+            "post": {},
+            "put": {},
+            "delete": {}
         }
         if error_page == None:
             self.error_page = {0: StaticSite(
@@ -397,6 +440,30 @@ def serves_post(path: str):
     """
     def my_wrap(func):
         _sitemap.register_site("POST", func, path)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    return my_wrap
+
+
+def serves(method: str, path: str):
+    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
+
+    Example(s):
+
+    return ({'response_code': 200}, 'Hello World!')
+
+    You can also give more headers:
+
+    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
+
+    Or, if you'd like to type as little as you can:
+
+    return {'code':200},'Hello there!'
+    """
+    def my_wrap(func):
+        _sitemap.register_site(method, func, path)
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)

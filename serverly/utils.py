@@ -15,14 +15,13 @@ def check_relative_path(path: str):
 def get_http_method_type(method: str):
     if type(method) != str:
         raise TypeError(
-            "method argument expected to be of type string. 'GET' and 'POST' are valid.")
-    if method.lower() == "get":
-        method = "get"
-    elif method.lower() == "post":
-        method = "post"
-    else:
+            "method argument expected to be of type string.")
+    supported_methods = ["get", "post", "put", "delete"  # , "head", "connect", "options", "trace", "patch"
+                         ]
+    method = method.lower()
+    if not method in supported_methods:
         raise Exception(
-            "Method argument invalid. Expected 'GET' or 'POST'.")
+            "Request method not compliant with the HTTP Protocol. Please see here for more information on compatible methods: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods")
     return method
 
 
@@ -61,7 +60,10 @@ def guess_response_info(content: str):
         c_type = "text/html"
     else:
         try:
-            json.loads(content)
+            if type(content) == str:
+                json.loads(content)
+            else:
+                json.dumps(content)
             c_type = "application/json"
         except json.JSONDecodeError:
             c_type = "text/plain"
