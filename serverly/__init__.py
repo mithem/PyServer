@@ -50,7 +50,7 @@ from serverly import default_sites
 from serverly.utils import *
 from serverly.objects import Request, Response
 
-version = "0.1.5"
+version = "0.2.0"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
@@ -252,8 +252,13 @@ class Sitemap:
             "delete": {}
         }
         if error_page == None:
-            self.error_page = {0: StaticSite(
-                "/error", "none"), 404: default_sites.page_not_found_error, 500: default_sites.general_server_error}
+            self.error_page = {
+                0: StaticSite(
+                    "/error", "none"),
+                404: default_sites.page_not_found_error,
+                500: default_sites.general_server_error,
+                942: default_sites.user_function_did_not_return_response_object
+            }
         elif issubclass(error_page.__class__, StaticSite):
             self.error_page = {0: error_page}
         elif type(error_page) == dict:
@@ -318,7 +323,6 @@ class Sitemap:
             print("*"*20, "Site to use", "*"*20)
             print(site.path, site.file_path)
         elif callable(site):
-            type_error_msg = f"Stuff that was returned by function {site.__name__} is not acceptable. Expected tuple[dict, str]."
             try:
                 content = site(request)
             except TypeError:
@@ -339,34 +343,14 @@ class Sitemap:
             response = Response(200, {}, "")
             if isinstance(content, Response):
                 response = content
-            elif type(content) == tuple:
-                v1 = False
-                v2 = False
-                if type(content[0]) == str:
-                    v1 = True
-                    if type(content[1]) == dict:
-                        response.code, response.headers = parse_response_info(
-                            content[1], len(content[0]))
-                        response.body = content[0]
-                        v2 = True
-                    else:
-                        raise TypeError(type_error_msg)
-                if type(content[0]) == dict:
-                    if type(content[1]) == str:
-                        response.body = content[1]
-                        v2 = True
-                    else:
-                        raise TypeError(type_error_msg)
-                    response.code, response.headers = parse_response_info(
-                        content[0], len(content[1]))
-                    v1 = True
-                if not v1 and not v2:
-                    raise ValueError(type_error_msg +
-                                     " Response was: " + str(content))
-            elif type(content) == str:
-                response = Response(200, {}, content)
-            elif type(content) == dict:
-                response = Response(200, content, "")
+            else:
+                try:
+                    raise UserWarning(
+                        f"Function for '{request.path}' needs to return a Response object. Website will be a warning message (not your content but serverly's).")
+                except Exception as e:
+                    logger.handle_exception(e)
+                response = self.get_func_or_site_response(
+                    self.error_page.get(942, self.error_page[0]), request)
         response.body = response.body.replace(
             "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
         print(response)
