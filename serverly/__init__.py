@@ -48,6 +48,7 @@ import serverly.stater
 from fileloghelper import Logger
 from serverly import default_sites
 from serverly.utils import *
+from serverly.objects import Request, Response
 
 version = "0.1.5"
 description = "A really simple-to-use HTTP-server"
@@ -60,12 +61,12 @@ logger.header(True, True, description, fileloghelper_version=True,
 
 class Handler(BaseHTTPRequestHandler):
 
-    def respond(self, code, headers, content):
-        self.send_response(code)
-        for key, value in headers.items():
+    def respond(self, response: Response):
+        self.send_response(response.code)
+        for key, value in response.headers.items():
             self.send_header(key, value)
         self.end_headers()
-        self.wfile.write(bytes(content, "utf-8"))
+        self.wfile.write(bytes(response.body, "utf-8"))
 
     def do_GET(self):
         try:
@@ -74,11 +75,10 @@ class Handler(BaseHTTPRequestHandler):
             received_data = str(self.rfile.read(data_length), "utf-8")
             request = Request("GET", parsed_url.path, dict(
                 self.headers), received_data, self.client_address)
-            response_code, content, headers = _sitemap.get_content(request)
+            response = _sitemap.get_content(request)
             logger.context = name + ": GET"
-            logger.debug(
-                f"Sent {str(response_code)}, path {parsed_url.path} (GET)")
-            self.respond(response_code, headers, content)
+            logger.debug(str(response))
+            self.respond(response)
         except Exception as e:
             serverly.stater.error()
             logger.handle_exception(e)
@@ -89,13 +89,12 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-
-            response_code, content, headers = _sitemap.get_content(
-                "POST", parsed_url.path, received_data)
-            self.respond(response_code, headers, content)
+            request = Request("POST", parsed_url.path, dict(
+                self.headers), received_data, self.client_address)
+            response = _sitemap.get_content(request)
+            self.respond(response)
             logger.context = name + ": POST"
-            logger.debug(
-                f"Sent {str(response_code)}, path {parsed_url.path} (POST)")
+            logger.debug(str(response))
         except Exception as e:
             serverly.stater.error()
             logger.handle_exception(e)
@@ -134,23 +133,6 @@ class Handler(BaseHTTPRequestHandler):
             serverly.stater.error()
             logger.handle_exception(e)
             raise e
-
-
-class Request:
-    """This is passed along to registered functions as a representation of what the client requested."""
-
-    def __init__(self, method: str, path: str, headers: dict, data: Union[str, dict], address: tuple):
-        self.method = get_http_method_type(method)
-        self.path = path
-        self.headers = headers
-        try:
-            self.body = json.loads(data)
-        except json.JSONDecodeError:
-            self.body = data
-        self.address = address
-
-    def __str__(self):
-        return f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"
 
 
 class Server:
@@ -330,6 +312,7 @@ class Sitemap:
         if isinstance(site, StaticSite):
             text = site.get_content()
             filetype = guess_filetype_on_filename(site.file_path)
+            print("FILETYPE:", filetype)
             info = {"Content-type": filetype,
                     "Content-Length": len(text)}
             print("*"*20, "Site to use", "*"*20)
@@ -347,68 +330,72 @@ class Sitemap:
                         f"Function '{site.__name__}' either takes to many arguments (only object of type Request provided) or raises a TypeError")
                 except Exception as e:
                     logger.handle_exception(e)
-                    content = "500 - Internal server error"
+                    content = "500 - Internal server error - " + str(e)
                     raise e
             except Exception as e:
                 logger.handle_exception(e)
-                content = "500 - Internal server error"
+                content = "500 - Internal server error - " + str(e)
                 raise e
-            if type(content) == tuple:
+            response = Response(200, {}, "")
+            if isinstance(content, Response):
+                response = content
+            elif type(content) == tuple:
                 v1 = False
                 v2 = False
                 if type(content[0]) == str:
                     v1 = True
                     if type(content[1]) == dict:
-                        response_code, info = parse_response_info(
+                        response.code, response.headers = parse_response_info(
                             content[1], len(content[0]))
-                        text = content[0]
+                        response.body = content[0]
                         v2 = True
                     else:
                         raise TypeError(type_error_msg)
                 if type(content[0]) == dict:
                     if type(content[1]) == str:
-                        text = content[1]
+                        response.body = content[1]
                         v2 = True
                     else:
                         raise TypeError(type_error_msg)
-                    response_code, info = parse_response_info(
+                    response.code, response.headers = parse_response_info(
                         content[0], len(content[1]))
                     v1 = True
                 if not v1 and not v2:
                     raise ValueError(type_error_msg +
                                      " Response was: " + str(content))
             elif type(content) == str:
-                response_code, info = guess_response_info(content)
-                print(response_code, info)
-                text = content
+                response = Response(200, {}, content)
             elif type(content) == dict:
-                info = content
-                text = ""
-        text = text.replace(
+                response = Response(200, content, "")
+        response.body = response.body.replace(
             "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
-        return response_code, info, text
+        print(response)
+        return response
 
     def get_content(self, request: Request):
         response_code = 500
         text = ""
         info = {}
         site = None
-        for pattern in self.methods[request.method]:
+        for pattern in self.methods[request.method].keys():
             if re.match(pattern, request.path):
                 site = self.methods[request.method][pattern]
+                break
         if site == None:
             response_code = 404
             site = self.error_page.get(404, self.error_page[0])
+            response = self.get_func_or_site_response(
+                site, request)
         try:
-            response_code, info, text = self.get_func_or_site_response(
+            response = self.get_func_or_site_response(
                 site, request)
         except Exception as e:
             logger.handle_exception(e)
             site = self.error_page.get(500, self.error_page[0])
-            response_code, info, text = self.get_func_or_site_response(
+            response = self.get_func_or_site_response(
                 site, "")
             serverly.stater.error()
-        return response_code, text, info
+        return response
 
 
 _sitemap = Sitemap()

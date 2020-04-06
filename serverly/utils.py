@@ -21,7 +21,7 @@ def get_http_method_type(method: str):
     method = method.lower()
     if not method in supported_methods:
         raise Exception(
-            "Request method not compliant with the HTTP Protocol. Please see here for more information on compatible methods: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods")
+            "Request method not supported. Supported are GET, POST, PUT & DELETE.")
     return method
 
 
@@ -56,8 +56,11 @@ def parse_response_info(info: dict, content_length=0):
 
 
 def guess_filetype_on_filename(filename):
+    print("FILENAME:", filename)
     if filename[-4:] == ".ico":
         return "image/x-icon"
+    else:
+        return "text/plain"
 
 
 def guess_response_info(content: str):
@@ -72,4 +75,4 @@ def guess_response_info(content: str):
             c_type = "application/json"
         except json.JSONDecodeError:
             c_type = "text/plain"
-    return 200, {"Content-type": c_type, "Content-Length": len(content)}
+    return {"Content-type": c_type, "Content-Length": len(content)}

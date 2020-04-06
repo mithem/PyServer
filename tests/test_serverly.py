@@ -25,5 +25,29 @@ def test_sitemap():
     r1 = serverly.Request("GET", "/", {}, "", (0, 0))
     r2 = serverly.Request(
         "GET", "/notavalidurlactuallyitisvalid", {}, "", (0, 0))
-    assert serverly._sitemap.get_content(r1)[1] == "hello world!"
-    assert serverly._sitemap.get_content(r2)[1] == "404 - Page not found"
+    assert serverly._sitemap.get_content(r1).body == "hello world!"
+    assert serverly._sitemap.get_content(r2).body == "404 - Page not found"
+
+
+def test_request():
+    content = "Hello, World!"
+    req = serverly.Request("GET", "/helloworld", {"Content-type": "text/plain",
+                                                  "Content-Length": len(content)}, content, ("localhost", 8080))
+    assert req.body == content
+    assert req.obj == None
+    assert req.headers == {"Content-type": "text/plain",
+                           "Content-Length": len(content)}
+    assert req.address == ("localhost", 8080)
+    assert req.path == "/helloworld"
+    assert req.method == "get"
+
+
+def test_response():
+    content = "<html><h1>Hello, World</h1></html>"
+    res = serverly.Response(body=content)
+
+    assert res.headers == {"Content-type": "text/html",
+                           "Content-Length": len(content)}
+    assert res.body == content
+    assert res.code == 200
+    assert res.obj == None
