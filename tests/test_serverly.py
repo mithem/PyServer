@@ -21,12 +21,14 @@ def test_get_server_address_2():
 
 
 def test_sitemap():
-    serverly.register_get(lambda data: ({"code": 200}, "hello world!"), "/")
+    def hello_world(req):
+        return serverly.Response(body="hello world!")
+    serverly.register_get(hello_world, "/")
     r1 = serverly.Request("GET", "/", {}, "", (0, 0))
     r2 = serverly.Request(
         "GET", "/notavalidurlactuallyitisvalid", {}, "", (0, 0))
     assert serverly._sitemap.get_content(r1).body == "hello world!"
-    assert serverly._sitemap.get_content(r2).body == "404 - Page not found"
+    assert "404 - Page not found" in serverly._sitemap.get_content(r2).body
 
 
 def test_request():
