@@ -51,7 +51,7 @@ import importlib
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
-version = "0.2.6"
+version = "0.2.7"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -488,29 +488,31 @@ def register_error_response(code: int, msg_base: str, mode="enumerate"):
     - enumerate: append every arg by comma and space to the base
     - base: only return the base message
     """
-    def enumer(*args):
+    def enumer(msg_base, *args):
         result = msg_base + ', '.join(args)
         if result[-1] != ".":
             result += "."
         return result
 
-    def base_only(*args):
+    def base_only(msg_base, *args):
         if msg_base[-1] != ".":
             msg_base += "."
         return msg_base
 
     if mode.lower() == "enumerate" or mode.lower() == "enum":
-        error_response_templates[code] = enumer
+        error_response_templates[code] = (enumer, msg_base)
     elif mode.lower() == "base":
-        error_response_templates[code] = base_only
+        error_response_templates[code] = (base_only, msg_base)
     else:
         raise ValueError("Mode not valid. Expected 'enumerate' or 'base'.")
+    print(f"registered error response for {str(code)} with base {msg_base}")
 
 
 def error_response(code: int, *args):
     """Define template error responses by calling serverly.register_error_response(code: int, msg_base: str, mode="enumerate")"""
     try:
-        return Response(code, body=error_response_templates[code](*args))
+        t = error_response_templates[code]
+        return Response(code, body=t[0](t[1], *args))
     except KeyError:
         raise ValueError(
             f"No template found for code {str(code)}. Please make sure to register them by calling register_error_response.")
