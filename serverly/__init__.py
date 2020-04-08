@@ -51,7 +51,7 @@ from serverly import default_sites
 from serverly.objects import Request, Response
 from serverly.utils import *
 
-version = "0.2.1"
+version = "0.2.2"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
@@ -77,9 +77,9 @@ class Handler(BaseHTTPRequestHandler):
             request = Request("GET", parsed_url.path, dict(
                 self.headers), received_data, self.client_address)
             response = _sitemap.get_content(request)
+            self.respond(response)
             logger.context = name + ": GET"
             logger.debug(str(response))
-            self.respond(response)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -106,13 +106,12 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-
-            response_code, content, headers = _sitemap.get_content(
-                "PUT", parsed_url.path, received_data)
-            self.respond(response_code, headers, content)
+            request = Request("PUT", parsed_url.path, dict(
+                self.headers), received_data, self.client_address)
+            response = _sitemap.get_content(request)
+            self.respond(response)
             logger.context = name + ": PUT"
-            logger.debug(
-                f"Sent {str(response_code)}, path {parsed_url.path} (PUT)")
+            logger.debug(str(response))
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -123,13 +122,12 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-
-            response_code, content, headers = _sitemap.get_content(
-                "DELETE", parsed_url.path, received_data)
-            self.respond(response_code, headers, content)
+            request = Request("DELETE", parsed_url.path, dict(
+                self.headers), received_data, self.client_address)
+            response = _sitemap.get_content(request)
+            self.respond(response)
             logger.context = name + ": DELETE"
-            logger.debug(
-                f"Sent {str(response_code)}, path {parsed_url.path} (DELETE)")
+            logger.debug(str(response))
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
