@@ -311,10 +311,7 @@ class Sitemap:
     def get_func_or_site_response(self, site, request: Request):
         response = Response()
         if isinstance(site, StaticSite):
-            text = site.get_content()
-            filetype = mimetypes.guess_type(site.file_path)
-            info = {"Content-type": filetype,
-                    "Content-Length": len(text)}
+            response = Response(body=site.get_content())
         elif callable(site):
             try:
                 content = site(request)
