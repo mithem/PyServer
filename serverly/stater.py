@@ -49,13 +49,11 @@ def setup(servername: str, serverpassword: str, componentname: str, errorthresho
 def error():
     global _errors
     global error_treshold
-    print(_errors)
     try:
         now = datetime.datetime.now()
         _errors.append(now.isoformat())
         old = datetime.datetime.fromisoformat(_errors[-2])
         new = now - datetime.timedelta(minutes=error_threshold)
-        print(new, old)
         if new < old:
             stage = 2
         else:

@@ -56,7 +56,6 @@ def parse_response_info(info: dict, content_length=0):
 
 
 def guess_filetype_on_filename(filename):
-    print("FILENAME:", filename)
     if filename[-4:] == ".ico":
         return "image/x-icon"
     else:

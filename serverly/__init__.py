@@ -317,11 +317,8 @@ class Sitemap:
         if isinstance(site, StaticSite):
             text = site.get_content()
             filetype = guess_filetype_on_filename(site.file_path)
-            print("FILETYPE:", filetype)
             info = {"Content-type": filetype,
                     "Content-Length": len(text)}
-            print("*"*20, "Site to use", "*"*20)
-            print(site.path, site.file_path)
         elif callable(site):
             try:
                 content = site(request)
@@ -353,7 +350,6 @@ class Sitemap:
                     self.error_page.get(942, self.error_page[0]), request)
         response.body = response.body.replace(
             "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
-        print(response)
         return response
 
     def get_content(self, request: Request):
