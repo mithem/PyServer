@@ -56,10 +56,11 @@ def parse_response_info(info: dict, content_length=0):
 
 
 def guess_filetype_on_filename(filename):
-    if filename[-4:] == ".ico":
-        return "image/x-icon"
-    else:
-        return "text/plain"
+    file_types = {
+        "html": "text/html"
+    }
+    ext = filename.split(".")[-1]
+    return file_types.get(ext.lower(), "text/plain")
 
 
 def guess_response_info(content: str):

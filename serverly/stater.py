@@ -20,6 +20,9 @@ def set(status_code: int):
         except st.ConnectionTimeout:
             raise Warning(
                 "Connection timeout to stater server. Cannot update status.")
+        except Exception as e:
+            raise Warning(
+                f"[{type(e).__name__}] Error while updating the status of the stater server: " + str(e))
 
 
 def setup(servername: str, serverpassword: str, componentname: str, errorthreshold=60):
@@ -46,7 +49,7 @@ def setup(servername: str, serverpassword: str, componentname: str, errorthresho
         raise TypeError("errorthreshold expected to be of type str.")
 
 
-def error():
+def error(logger):
     global _errors
     global error_treshold
     try:
@@ -60,4 +63,7 @@ def error():
             stage = 1
     except IndexError:
         stage = 1
-    set(stage)
+    try:
+        set(stage)
+    except Exception as e:
+        logger.handle_exception(e)

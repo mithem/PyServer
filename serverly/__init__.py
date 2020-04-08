@@ -37,6 +37,7 @@ def hello_world(data):
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """
 import importlib
+import mimetypes
 import re
 import urllib.parse as parse
 import warnings
@@ -47,8 +48,8 @@ from typing import Union
 import serverly.stater
 from fileloghelper import Logger
 from serverly import default_sites
-from serverly.utils import *
 from serverly.objects import Request, Response
+from serverly.utils import *
 
 version = "0.2.0"
 description = "A really simple-to-use HTTP-server"
@@ -80,7 +81,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.debug(str(response))
             self.respond(response)
         except Exception as e:
-            serverly.stater.error()
+            serverly.stater.error(logger)
             logger.handle_exception(e)
             raise e
 
@@ -96,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.context = name + ": POST"
             logger.debug(str(response))
         except Exception as e:
-            serverly.stater.error()
+            serverly.stater.error(logger)
             logger.handle_exception(e)
             raise e
 
@@ -113,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.debug(
                 f"Sent {str(response_code)}, path {parsed_url.path} (PUT)")
         except Exception as e:
-            serverly.stater.error()
+            serverly.stater.error(logger)
             logger.handle_exception(e)
             raise e
 
@@ -130,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
             logger.debug(
                 f"Sent {str(response_code)}, path {parsed_url.path} (DELETE)")
         except Exception as e:
-            serverly.stater.error()
+            serverly.stater.error(logger)
             logger.handle_exception(e)
             raise e
 
@@ -313,10 +314,10 @@ class Sitemap:
                 f"Site for path '{path}' not found. Cannot be unregistered.")
 
     def get_func_or_site_response(self, site, request: Request):
-        response_code = 200
+        response = Response()
         if isinstance(site, StaticSite):
             text = site.get_content()
-            filetype = guess_filetype_on_filename(site.file_path)
+            filetype = mimetypes.guess_type(site.file_path)
             info = {"Content-type": filetype,
                     "Content-Length": len(text)}
         elif callable(site):
@@ -357,6 +358,7 @@ class Sitemap:
         text = ""
         info = {}
         site = None
+        response = None
         for pattern in self.methods[request.method].keys():
             if re.match(pattern, request.path):
                 site = self.methods[request.method][pattern]
@@ -374,7 +376,7 @@ class Sitemap:
             site = self.error_page.get(500, self.error_page[0])
             response = self.get_func_or_site_response(
                 site, "")
-            serverly.stater.error()
+            serverly.stater.error(logger)
         return response
 
 
