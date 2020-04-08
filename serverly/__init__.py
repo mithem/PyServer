@@ -51,7 +51,7 @@ from serverly import default_sites
 from serverly.objects import Request, Response
 from serverly.utils import *
 
-version = "0.2.3"
+version = "0.2.4"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
@@ -499,7 +499,7 @@ def register_error_response(code: int, msg_base: str, mode="enumerate"):
     - base: only return the base message
     """
     def enumer(*args):
-        return msg_base + ', '.join(*args)[:-2]
+        return msg_base + ', '.join(list(*args))[:-2]
 
     def base_only(*args):
         return msg_base
