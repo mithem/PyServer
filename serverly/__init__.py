@@ -51,7 +51,7 @@ from serverly import default_sites
 from serverly.objects import Request, Response
 from serverly.utils import *
 
-version = "0.2.0"
+version = "0.2.1"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
