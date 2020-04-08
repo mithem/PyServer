@@ -51,7 +51,7 @@ from serverly import default_sites
 from serverly.objects import Request, Response
 from serverly.utils import *
 
-version = "0.2.2"
+version = "0.2.3"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
@@ -488,3 +488,39 @@ def start(superpath: str = "/"):
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
+
+
+def register_error_response(code: int, msg_base: str, mode="enumerate"):
+    """register an error response template for `code`including the message-stem `msg_base`and accepting *args as defined by `mode`
+
+    Modes
+    ---
+    - enumerate: append every arg by comma and space to the base
+    - base: only return the base message
+    """
+    def enumer(*args):
+        return msg_base + ', '.join(*args)[:-2]
+
+    def base_only(*args):
+        return msg_base
+
+    if mode.lower() == "enumerate" or mode.lower() == "enum":
+        error_response_templates[code] = enumer
+    elif mode.lower() == "base":
+        error_response_templates[code] = base_only
+    else:
+        raise ValueError("Mode not valid. Expected 'enumerate' or 'base'.")
+
+
+def error_response(code: int, *args):
+    """Define template error responses by calling serverly.register_error_response(code: int, msg_base: str, mode="enumerate")"""
+    try:
+        return Response(code, body=error_response_templates[code](*args))
+    except KeyError:
+        raise ValueError(
+            f"No template found for code {str(code)}. Please make sure to register them by calling register_error_response.")
+    except Exception as e:
+        logger.handle_exception(e)
+
+
+error_response_templates = {}
