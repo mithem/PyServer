@@ -499,7 +499,7 @@ def register_error_response(code: int, msg_base: str, mode="enumerate"):
     - base: only return the base message
     """
     def enumer(*args):
-        return msg_base + ', '.join(list(*args))[:-2]
+        return msg_base + ', '.join(args)
 
     def base_only(*args):
         return msg_base
