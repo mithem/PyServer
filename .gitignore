@@ -10,3 +10,4 @@ build/
 .coverage
 cov.xml
 favicon.ico
+*.patch
