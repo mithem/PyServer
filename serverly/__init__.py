@@ -51,7 +51,7 @@ import importlib
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
-version = "0.2.7"
+version = "0.2.8"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -505,7 +505,6 @@ def register_error_response(code: int, msg_base: str, mode="enumerate"):
         error_response_templates[code] = (base_only, msg_base)
     else:
         raise ValueError("Mode not valid. Expected 'enumerate' or 'base'.")
-    print(f"registered error response for {str(code)} with base {msg_base}")
 
 
 def error_response(code: int, *args):
