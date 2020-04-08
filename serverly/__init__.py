@@ -16,9 +16,7 @@ Methods
 --
 `static_page(file_path, path)` register a static page while the file is located under `file_path` and will serve `path`
 
-`register_get(func, path: str)` register dynamic GET page (function)
-
-`register_post(func, path: str)` register dynamic POST page (function)
+`register(func, path: str)` 
 
 `unregister(method: str, path: str)`unregister any page (static or dynamic). Only affect the `method`-path (GET / POST)
 
@@ -27,7 +25,7 @@ Methods
 
 Decorators (technically methods)
 --
-`serves_get(path: str`/`serves_post(path: str)` Register the function to serve a specific path.
+`serves(method: str, path: str)` Register the function to serve a specific path.
 Example:
 ```
 @serves_get("/hello(world)?")
@@ -36,25 +34,24 @@ def hello_world(data):
 ```
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """
-import importlib
-import mimetypes
-import re
-import urllib.parse as parse
-import warnings
-from functools import wraps
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Union
-
-import serverly.stater
-from fileloghelper import Logger
-from serverly import default_sites
-from serverly.objects import Request, Response
 from serverly.utils import *
+from serverly.objects import Request, Response
+from serverly import default_sites
+from fileloghelper import Logger
+import serverly.stater
+from typing import Union
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from functools import wraps
+import warnings
+import urllib.parse as parse
+import re
+import mimetypes
+import importlib
 
-version = "0.2.6"
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
+version = "0.2.6"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -396,13 +393,13 @@ def serves_get(path: str):
 
     return {'code':200},'Hello there!'
     """
-    def my_wrap(func):
+    def wrapper_function(func):
         _sitemap.register_site("GET", func, path)
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
-    return my_wrap
+    return wrapper_function
 
 
 def serves_post(path: str):
@@ -420,13 +417,13 @@ def serves_post(path: str):
 
     return {'code':200},'Hello there!'
     """
-    def my_wrap(func):
+    def wrapper_function(func):
         _sitemap.register_site("POST", func, path)
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
-    return my_wrap
+    return wrapper_function
 
 
 def serves(method: str, path: str):
@@ -444,13 +441,13 @@ def serves(method: str, path: str):
 
     return {'code':200},'Hello there!'
     """
-    def my_wrap(func):
+    def wrapper_function(func):
         _sitemap.register_site(method, func, path)
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
-    return my_wrap
+    return wrapper_function
 
 
 def static_page(file_path, path):
@@ -461,18 +458,11 @@ def static_page(file_path, path):
     _sitemap.register_site("GET", site)
 
 
-def register_get(func, path: str):
-    """Register dynamic GET page (function)"""
-    check_relative_path(path)
-    if callable(func):
-        _sitemap.register_site("GET", func, path)
-
-
-def register_post(func, path: str):
-    """Register dynamic POST page (function)"""
-    check_relative_path(path)
-    if callable(func):
-        _sitemap.register_site("POST", func, path)
+def register_function(method: str, path: str, function):
+    if callable(function):
+        _sitemap.register_site(method, function, path)
+    else:
+        raise TypeError("'function' not callable.")
 
 
 def unregister(method: str, path: str):

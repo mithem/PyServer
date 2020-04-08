@@ -10,6 +10,11 @@ error_threshold = 60  # minutes
 
 
 def set(status_code: int):
+    """
+
+    :param status_code: int: new status code
+
+    """
     if type(status_code) != int:
         raise TypeError("status_code expected to be of type int.")
     if server_name != None and server_password != None and component_name != None:
@@ -26,7 +31,13 @@ def set(status_code: int):
 
 
 def setup(servername: str, serverpassword: str, componentname: str, errorthreshold=60):
-    """assign all required variabled"""
+    """assign all required variables
+
+    :param servername: str: name of the server (in stater)
+    :param serverpassword: str: password of the server (in stater)
+    :param componentname: str: name of the component (this server) in stater
+    :param errorthreshold: amount of minutes in which multiple calls of error() will trigger stater to mark this server/component as failed(Default value = 60)
+    """
     global server_name
     global server_password
     global component_name
@@ -50,6 +61,11 @@ def setup(servername: str, serverpassword: str, componentname: str, errorthresho
 
 
 def error(logger):
+    """
+
+    :param logger: logger to log any exceptions to
+
+    """
     global _errors
     global error_treshold
     try:
