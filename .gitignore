@@ -11,3 +11,4 @@ build/
 cov.xml
 favicon.ico
 *.patch
+*.html
