@@ -2,6 +2,8 @@ import pytest
 import serverly
 import json
 
+print("SERVERLY VERSION v" + serverly.version)
+
 
 def test_get_server_address():
     valid = ("localhost", 8080)
@@ -37,11 +39,19 @@ def test_request():
                                                   "Content-Length": len(content)}, content, ("localhost", 8080))
     assert req.body == content
     assert req.obj == None
-    assert req.headers == {"Content-type": "text/plain",
-                           "Content-Length": len(content)}
+    print(type(req.headers))
+    assert req.headers["content-type"] == "text/plain"
+    assert req.headers["content-length"] == len(content)
+    assert req.headers["CONTENT-type"] == "text/plain"
+    assert req.headers["content-LENGTH"] == len(content)
     assert req.address == ("localhost", 8080)
     assert req.path == "/helloworld"
     assert req.method == "get"
+
+    assert req.auth_type == None
+    assert req.user_cred == None
+    assert req.user_name == None
+    assert req.user_password == None
 
 
 def test_response():
