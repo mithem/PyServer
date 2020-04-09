@@ -51,7 +51,7 @@ import importlib
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "Serverly"
-version = "0.2.9"
+version = "0.2.10"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)

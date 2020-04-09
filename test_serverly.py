@@ -25,7 +25,7 @@ def test_get_server_address_2():
 def test_sitemap():
     def hello_world(req):
         return serverly.Response(body="hello world!")
-    serverly.register_get(hello_world, "/")
+    serverly.register_function("GET", "/", hello_world)
     r1 = serverly.Request("GET", "/", {}, "", (0, 0))
     r2 = serverly.Request(
         "GET", "/notavalidurlactuallyitisvalid", {}, "", (0, 0))
@@ -35,15 +35,13 @@ def test_sitemap():
 
 def test_request():
     content = "Hello, World!"
+    cl = len(content)
     req = serverly.Request("GET", "/helloworld", {"Content-type": "text/plain",
-                                                  "Content-Length": len(content)}, content, ("localhost", 8080))
+                                                  "Content-Length": cl}, content, ("localhost", 8080))
     assert req.body == content
     assert req.obj == None
-    print(type(req.headers))
-    assert req.headers["content-type"] == "text/plain"
-    assert req.headers["content-length"] == len(content)
-    assert req.headers["CONTENT-type"] == "text/plain"
-    assert req.headers["content-LENGTH"] == len(content)
+    assert req.headers == {"Content-type": "text/plain",
+                           "Content-Length": cl}
     assert req.address == ("localhost", 8080)
     assert req.path == "/helloworld"
     assert req.method == "get"
@@ -52,6 +50,25 @@ def test_request():
     assert req.user_cred == None
     assert req.user_name == None
     assert req.user_password == None
+
+
+def test_request_2():
+    content = "Lorem Impsum"
+    cl = len(content)
+    req = serverly.Request(
+        "PUT", "/lorem/ipsum", {"Content-type": "text/plain", "Content-Length": cl, "Authentication": "basic hello:world"}, content, ("localhost", 8080))
+
+    print(req.auth_type)
+
+    assert req.body == content
+    assert req.obj == None
+    assert req.headers == {"Content-type": "text/plain",
+                           "Content-Length": cl, "Authentication": "basic hello:world"}
+
+    assert req.auth_type == "basic"
+    assert req.user_cred == ("hello", "world")
+    assert req.user_name == "hello"
+    assert req.user_password == "world"
 
 
 def test_response():
@@ -63,3 +80,7 @@ def test_response():
     assert res.body == content
     assert res.code == 200
     assert res.obj == None
+
+
+if __name__ == "__main__":
+    test_request_2()

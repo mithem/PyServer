@@ -1,3 +1,5 @@
+import base64
+import collections.abc
 import json as jsonjson
 from typing import Union
 
@@ -52,8 +54,30 @@ class Request(CommunicationObject):
         self.path = path
         self.address = address
 
+        self.authenticated = False
+        for key, value in headers.items():
+            if key.lower() == "authentication" or key.lower() == "authorization":
+                self.auth_type, user_cred = tuple(value.split(" "))
+                decoded = str(base64.b64decode(user_cred), "utf-8")
+                self.user_cred = tuple(decoded.split(":"))
+                self.user_name = self.user_cred[0]
+                self.user_password = self.user_cred[1]
+                self.authenticated = True
+        if not self.authenticated:
+            self._set_auth_none()
+        self.authorized = self.authenticated
+
+    def _set_auth_none(self):
+        self.auth_type = None
+        self.user_cred = None
+        self.user_name = None
+        self.user_password = None
+
     def __str__(self):
-        return f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"
+        s = f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers."
+        if self.auth_type != None:
+            s += f" With '{self.auth_type}' authentication."
+        return s
 
 
 class Response(CommunicationObject):
