@@ -1,5 +1,12 @@
-import os
 import json
+import os
+import random
+import string
+
+
+def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
+    """return a random str with length `size` with the members of `chars`, e.g. only lowercase = 'abcde...'"""
+    return ''.join(random.choice(chars) for x in range(size))
 
 
 def check_relative_path(path: str):

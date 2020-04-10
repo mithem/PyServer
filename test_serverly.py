@@ -48,8 +48,6 @@ def test_request():
 
     assert req.auth_type == None
     assert req.user_cred == None
-    assert req.user_name == None
-    assert req.user_password == None
 
 
 def test_request_2():
@@ -63,7 +61,7 @@ def test_request_2():
     assert req.body == content
     assert req.obj == None
     assert req.headers == {"Content-type": "text/plain",
-                           "Content-Length": cl, "Authentication": "basic hello:world"}
+                           "Content-Length": cl, "Authentication": "Basic aGVsbG86d29ybGQ="}
 
     assert req.auth_type == "basic"
     assert req.user_cred == ("hello", "world")
@@ -80,6 +78,11 @@ def test_response():
     assert res.body == content
     assert res.code == 200
     assert res.obj == None
+
+
+def test_ranstr():
+    for _ in range(100):
+        assert len(serverly.utils.ranstr()) == 20
 
 
 if __name__ == "__main__":

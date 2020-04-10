@@ -2,6 +2,7 @@ import base64
 import collections.abc
 import json as jsonjson
 from typing import Union
+import warnings
 
 from serverly.utils import get_http_method_type, guess_response_info
 
@@ -58,10 +59,15 @@ class Request(CommunicationObject):
         for key, value in headers.items():
             if key.lower() == "authentication" or key.lower() == "authorization":
                 self.auth_type, user_cred = tuple(value.split(" "))
-                decoded = str(base64.b64decode(user_cred), "utf-8")
-                self.user_cred = tuple(decoded.split(":"))
-                self.user_name = self.user_cred[0]
-                self.user_password = self.user_cred[1]
+                if self.auth_type.lower() == "basic":
+                    decoded = str(base64.b64decode(user_cred), "utf-8")
+                    self.user_cred = tuple(decoded.split(":"))
+                elif self.auth_type.lower() == "bearer":
+                    self.user_cred = user_cred
+                else:
+                    self.user_cred = None
+                    warnings.warn(
+                        "Requested auth method not supported. Expected Basic or Bearer")
                 self.authenticated = True
         if not self.authenticated:
             self._set_auth_none()
@@ -70,8 +76,6 @@ class Request(CommunicationObject):
     def _set_auth_none(self):
         self.auth_type = None
         self.user_cred = None
-        self.user_name = None
-        self.user_password = None
 
     def __str__(self):
         s = f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers."
