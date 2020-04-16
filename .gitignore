@@ -13,3 +13,4 @@ favicon.ico
 *.patch
 *.html
 *.json
+*.db

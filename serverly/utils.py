@@ -2,6 +2,7 @@ import json
 import os
 import random
 import string
+import copy
 
 
 def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
@@ -10,6 +11,7 @@ def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_
 
 
 def check_relative_path(path: str):
+    """Check if a path is valid as a web address. Returns True if valid, else raises different kinds of errors"""
     if type(path) == str:
         if path[0] == "/" or (path[0] == "^" and path[1] == "/"):
             return True
@@ -20,12 +22,10 @@ def check_relative_path(path: str):
 
 
 def get_http_method_type(method: str):
-    if type(method) != str:
-        raise TypeError(
-            "method argument expected to be of type string.")
+    """Return lowercase http method name, if valid. Else, raise Exception."""
     supported_methods = ["get", "post", "put", "delete"  # , "head", "connect", "options", "trace", "patch"
                          ]
-    method = method.lower()
+    method = str(method.lower())
     if not method in supported_methods:
         raise Exception(
             "Request method not supported. Supported are GET, POST, PUT & DELETE.")
@@ -83,3 +83,10 @@ def guess_response_info(content: str):
         except json.JSONDecodeError:
             c_type = "text/plain"
     return {"Content-type": c_type, "Content-Length": len(content)}
+
+
+def clean_user_object(user):
+    new = copy.deepcopy(user)
+    del new.salt
+    del new.password
+    return new

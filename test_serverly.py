@@ -50,25 +50,6 @@ def test_request():
     assert req.user_cred == None
 
 
-def test_request_2():
-    content = "Lorem Impsum"
-    cl = len(content)
-    req = serverly.Request(
-        "PUT", "/lorem/ipsum", {"Content-type": "text/plain", "Content-Length": cl, "Authentication": "basic hello:world"}, content, ("localhost", 8080))
-
-    print(req.auth_type)
-
-    assert req.body == content
-    assert req.obj == None
-    assert req.headers == {"Content-type": "text/plain",
-                           "Content-Length": cl, "Authentication": "Basic aGVsbG86d29ybGQ="}
-
-    assert req.auth_type == "basic"
-    assert req.user_cred == ("hello", "world")
-    assert req.user_name == "hello"
-    assert req.user_password == "world"
-
-
 def test_response():
     content = "<html><h1>Hello, World</h1></html>"
     res = serverly.Response(body=content)

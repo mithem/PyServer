@@ -132,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class Server:
-    def __init__(self, server_address, webaddress="/", name="pyserver", description="A PyServer instance."):
+    def __init__(self, server_address, webaddress="/", name="serverly", description="A serverly instance."):
         """
         :param webaddress: the internet address this server is accessed by (optional). It will automatically be inserted where a URL is recognized to be one of this server.
         :type webaddress: str
