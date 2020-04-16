@@ -50,7 +50,7 @@ import importlib
 
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
-name = "Serverly"
+name = "serverly"
 version = "0.2.11"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
@@ -376,20 +376,8 @@ _sitemap = Sitemap()
 
 
 def serves_get(path: str):
-    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
-
-    Example(s):
-
-    return ({'response_code': 200}, 'Hello World!')
-
-    You can also give more headers:
-
-    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
-
-    Or, if you'd like to type as little as you can:
-
-    return {'code':200},'Hello there!'
-    """
+    """Decorator for registering a function for `path`, with method GET"""
+    logger.handle_exception(DeprecationWarning("serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('GET') instead."))
     def wrapper_function(func):
         _sitemap.register_site("GET", func, path)
         @wraps(func)
@@ -400,20 +388,8 @@ def serves_get(path: str):
 
 
 def serves_post(path: str):
-    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
-
-    Example(s):
-
-    return ({'response_code': 200}, 'Hello World!')
-
-    You can also give more headers:
-
-    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
-
-    Or, if you'd like to type as little as you can:
-
-    return {'code':200},'Hello there!'
-    """
+    """Decorator for registering a function for `path`, with method POST"""
+    logger.handle_exception(DeprecationWarning("serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('POST') instead."))
     def wrapper_function(func):
         _sitemap.register_site("POST", func, path)
         @wraps(func)
@@ -424,20 +400,7 @@ def serves_post(path: str):
 
 
 def serves(method: str, path: str):
-    """When using this wrapper, please return a tuple with a dict containing 'response_code', and the content as a str.
-
-    Example(s):
-
-    return ({'response_code': 200}, 'Hello World!')
-
-    You can also give more headers:
-
-    return ({'response_code': 200, 'Content-type': 'text/plain', 'Content-Length': 4}, '1234')
-
-    Or, if you'd like to type as little as you can:
-
-    return {'code':200},'Hello there!'
-    """
+    """Decorator for registering a function for `path`, with `method`"""
     def wrapper_function(func):
         _sitemap.register_site(method, func, path)
         @wraps(func)
@@ -447,8 +410,8 @@ def serves(method: str, path: str):
     return wrapper_function
 
 
-def static_page(file_path, path):
-    """Register a static page while the file is located under `file_path` and will serve `path`"""
+def static_page(file_path: str, path: str):
+    """Register a static page where the file is located under `file_path` and will serve `path`"""
     check_relative_file_path(file_path)
     check_relative_path(path)
     site = StaticSite(path, file_path)
@@ -469,7 +432,7 @@ def unregister(method: str, path: str):
     _sitemap.unregister_site(method, path)
 
 
-def start(superpath: str = "/"):
+def start(superpath: str = '/'):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     logger.autosave = True
     _sitemap.superpath = superpath
@@ -478,12 +441,24 @@ def start(superpath: str = "/"):
 
 
 def register_error_response(code: int, msg_base: str, mode="enumerate"):
-    """register an error response template for `code`including the message-stem `msg_base`and accepting *args as defined by `mode`
+    """register an error response template for `code` based off the message-stem `msg_base`and accepting *args as defined by `mode`
 
     Modes
     ---
     - enumerate: append every arg by comma and space to the base
     - base: only return the base message
+    
+    Example
+    ---
+    ```
+    register_error_response(404, 'Page not found.', 'base'
+    ```
+    You can now get the 404-Response by calling `error_response(404)` -> Response(code=404, body='Page not found.')
+    Or in enumerate mode:
+    ```
+    register_error_response(999, 'I want to buy: ', 'enumerate')
+    ```
+    `error_response(999, 'apples', 'pineapples', 'bananas')` -> Response(code=9l9, body='I want to buy: apples, pineapples, bananas')
     """
     def enumer(msg_base, *args):
         result = msg_base + ', '.join(args)
