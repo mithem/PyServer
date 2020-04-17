@@ -1,1 +1,1 @@
-http
+fileloghelper>=1.6.0
