@@ -76,6 +76,7 @@ Raises:
 Get user, authenticated by username. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None
 
 Example:
+
 _Obviously, this password isn't hashed (& salted)_
 
 ```python
