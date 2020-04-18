@@ -1,10 +1,22 @@
 import base64
 import collections.abc
 import json as jsonjson
-from typing import Union
+import urllib.parse
 import warnings
+from typing import Union
 
 from serverly.utils import get_http_method_type, guess_response_info
+
+
+class DBObject:
+    """Subclass this to implement a `to_dict` method which is required by serverly to pass an object as a response body"""
+
+    def to_dict(self):
+        d = {}
+        for i in dir(self):
+            if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict":
+                d[i] = getattr(self, i)
+        return d
 
 
 class CommunicationObject:
@@ -33,7 +45,7 @@ class CommunicationObject:
         return self._body
 
     @body.setter
-    def body(self, body: Union[str, dict, list]):
+    def body(self, body: Union[str, dict, list, DBObject]):
         if type(body) == dict or type(body) == list:
             self._obj = body
             self._body = jsonjson.dumps(body)
@@ -43,12 +55,16 @@ class CommunicationObject:
                 self._obj = jsonjson.loads(body)
             except jsonjson.JSONDecodeError:
                 self._obj = None
+        elif issubclass(body.__class__, DBObject):
+            d = body.to_dict()
+            self._body = jsonjson.dumps(d)
+            self._obj = body
 
 
 class Request(CommunicationObject):
     """This is passed along to registered functions as a representation of what the client requested."""
 
-    def __init__(self, method: str, path: str, headers: dict, body: Union[str, dict], address: tuple):
+    def __init__(self, method: str, path: urllib.parse.ParseResult, headers: dict, body: Union[str, dict], address: tuple):
         super().__init__(headers, body)
 
         self.method = get_http_method_type(method)
