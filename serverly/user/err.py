@@ -8,3 +8,7 @@ class UserNotFoundError(Exception):
 
 class UserAlreadyExistsError(Exception):
     pass
+
+
+class MissingParameterError(Exception):
+    pass

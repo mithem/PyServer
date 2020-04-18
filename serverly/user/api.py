@@ -1,3 +1,7 @@
+"""This module holds the serverly standard API. This allows you to just specify endpoints while serverly takes care of the actual API for registering users, etc.).
+
+See the Postman documentation online: https://documenter.getpostman.com/view/10720102/Szf549XF?version=latest
+"""
 import serverly
 import serverly.utils
 from serverly import Request, Response, error_response
@@ -5,10 +9,6 @@ from serverly.user import err
 
 _RES_406 = Response(
     406, body="Unable to parse required parameters. Expected username, password.")
-
-
-def register(method: str, path: str):
-    serverly._sitemap.register_site(method, _api_register, path)
 
 
 def use(function: str, method: str, path: str):
@@ -31,16 +31,22 @@ def use(function: str, method: str, path: str):
 
 def _api_authenticate(req: Request):
     try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1])
+        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
         response = Response()
     except TypeError:
         try:
             serverly.user.authenticate(
-                req.obj["username"], req.obj["password"])
+                req.obj["username"], req.obj["password"], True)
             response = Response()
-        except (AttributeError, KeyError):
+        except (AttributeError, KeyError, TypeError):
             response = _RES_406
-            response.body += " Preferably put credentials in the header."
+        except err.UserNotFoundError as e:
+            response = Response(404, body=str(e))
+        except err.NotAuthenticatedError:
+            response = Response(401, body="Not authorized.")
+        except Exception as e:
+            serverly.logger.handle_exception(e)
+            response = Response(500, body=str(e))
     # not merging these two caus a duplicate registration *needs* to tell that a certain username is already taken
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
@@ -53,7 +59,9 @@ def _api_authenticate(req: Request):
 
 def _api_change(req: Request):
     try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1])
+        if not req.authenticated:
+            raise err.MissingParameterError
+        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
         serverly.user.change(req.user_cred[0], **req.obj)
         response = Response()
     except TypeError:
@@ -62,57 +70,65 @@ def _api_change(req: Request):
         response = Response(404, body=str(e))
     except err.NotAuthenticatedError:
         response = Response(401, body="Not authorized")
+    except err.MissingParameterError:
+        response = _RES_406
     return response
 
 
 def _api_delete(req: Request):
     try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1])
+        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
         serverly.user.delete(req.user_cred[0])
         response = Response()
     except TypeError:
         try:
             serverly.user.authenticate(
-                req.obj["username"], req.obj["password"])
+                req.obj["username"], req.obj["password"], True)
+            serverly.user.delete(req.obj["username"])
             response = Response()
-        except (AttributeError, KeyError):
+        except (TypeError, KeyError):
             response = _RES_406
-            response.body += " Preferably put credentials in the header."
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
     except err.NotAuthenticatedError:
         response = Response(401)
     except Exception as e:
         response = Response(500, body=str(e))
+    return response
 
 
 def _api_get(req: Request):
     try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1])
+        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
         user = serverly.user.get(req.user_cred[0])
         response = Response(body=serverly.utils.clean_user_object(user))
     except TypeError:
         try:
             serverly.user.authenticate(
-                req.obj["username"], req.obj["password"])
-            response = Response()
-        except (AttributeError, KeyError):
+                req.obj["username"], req.obj["password"], True)
+            user = serverly.user.get(req.obj["username"])
+            response = Response(body=serverly.utils.clean_user_object(user))
+        except (AttributeError, KeyError, TypeError) as e:
             response = _RES_406
-            response.body += " Preferably put credentials in the header."
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
     except err.NotAuthenticatedError:
         response = Response(401)
     except Exception as e:
+        serverly.logger.handle_exception(e)
         response = Response(500, body=str(e))
+    return response
 
 
 def _api_register(req: Request):
     try:
         serverly.user.register(**req.obj)
         response = Response()
-    except (KeyError, AttributeError) as e:
+    except (KeyError, AttributeError, TypeError) as e:
         response = _RES_406
+    except err.UserAlreadyExistsError as e:
+        response = Response(406, body=str(e))
     except Exception as e:
+        serverly.logger.handle_exception(e)
         response = Response(500, body=str(e))
     return response
