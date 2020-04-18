@@ -34,19 +34,21 @@ def hello_world(data):
 ```
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """
-from serverly.utils import *
-from serverly.objects import Request, Response
-from serverly import default_sites
-from fileloghelper import Logger
-import serverly.stater
-from typing import Union
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from functools import wraps
-import warnings
-import urllib.parse as parse
-import re
-import mimetypes
 import importlib
+import mimetypes
+import re
+import urllib.parse as parse
+import warnings
+from functools import wraps
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Union
+
+from fileloghelper import Logger
+
+import serverly.stater
+from serverly import default_sites
+from serverly.objects import Request, Response
+from serverly.utils import *
 
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
@@ -71,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("GET", parsed_url.path, dict(
+            request = Request("GET", parsed_url, dict(
                 self.headers), received_data, self.client_address)
             response = _sitemap.get_content(request)
             self.respond(response)
@@ -87,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("POST", parsed_url.path, dict(
+            request = Request("POST", parsed_url, dict(
                 self.headers), received_data, self.client_address)
             response = _sitemap.get_content(request)
             self.respond(response)
@@ -96,14 +98,13 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
-            raise e
 
     def do_PUT(self):
         try:
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("PUT", parsed_url.path, dict(
+            request = Request("PUT", parsed_url, dict(
                 self.headers), received_data, self.client_address)
             response = _sitemap.get_content(request)
             self.respond(response)
@@ -119,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("DELETE", parsed_url.path, dict(
+            request = Request("DELETE", parsed_url, dict(
                 self.headers), received_data, self.client_address)
             response = _sitemap.get_content(request)
             self.respond(response)
@@ -352,7 +353,7 @@ class Sitemap:
         site = None
         response = None
         for pattern in self.methods[request.method].keys():
-            if re.match(pattern, request.path):
+            if re.match(pattern, request.path.path):
                 site = self.methods[request.method][pattern]
                 break
         if site == None:
@@ -377,7 +378,9 @@ _sitemap = Sitemap()
 
 def serves_get(path: str):
     """Decorator for registering a function for `path`, with method GET"""
-    logger.handle_exception(DeprecationWarning("serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('GET') instead."))
+    logger.handle_exception(DeprecationWarning(
+        "serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('GET') instead."))
+
     def wrapper_function(func):
         _sitemap.register_site("GET", func, path)
         @wraps(func)
@@ -389,7 +392,9 @@ def serves_get(path: str):
 
 def serves_post(path: str):
     """Decorator for registering a function for `path`, with method POST"""
-    logger.handle_exception(DeprecationWarning("serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('POST') instead."))
+    logger.handle_exception(DeprecationWarning(
+        "serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('POST') instead."))
+
     def wrapper_function(func):
         _sitemap.register_site("POST", func, path)
         @wraps(func)
@@ -447,7 +452,7 @@ def register_error_response(code: int, msg_base: str, mode="enumerate"):
     ---
     - enumerate: append every arg by comma and space to the base
     - base: only return the base message
-    
+
     Example
     ---
     ```
