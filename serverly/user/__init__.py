@@ -5,14 +5,16 @@ from functools import wraps
 import sqlalchemy
 from serverly.user.err import (NotAuthenticatedError, UserAlreadyExistsError,
                                UserNotFoundError)
+from serverly.objects import DBObject
 from serverly.utils import ranstr
 from sqlalchemy import Column, Integer, String, Float, Boolean, Binary
 from sqlalchemy.ext.declarative import declarative_base
 
+
 Base = declarative_base()
 
 
-class User(Base):
+class User(Base, DBObject):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
@@ -23,7 +25,7 @@ class User(Base):
     def __str__(self):
         result = "<User("
         for i in dir(self):
-            if not i.startswith("_") and not i.endswith("_"):
+            if not i.startswith("_") and not i.endswith("_") and not callable(getattr(self, i)) and i != "metadata":
                 result += i + "=" + str(getattr(self, i)) + ", "
         result = result[:-2] + ")>"
         return result
@@ -46,12 +48,12 @@ algorithm = None
 salting = 1
 
 
-def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=True):
+def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False):
     """
 
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
     :param use_salting:  (Default value = True) Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure.
-    :param filename:  (Default value = "serverly_users.db") Filename of the SQLite DB.
+    :param filename:  (Default value = "serverly_users.db") Filename of the SQLite database.
     :param user_columns:  (Default value = {}) Attributes of a user, additionally to `id`, `username`, `password`and `salt` (which will not be used if not specified so). Example: ```python
     {
         'first_name': str,
@@ -63,7 +65,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     }
     ```
     Supported types are str, float, int, bytes, bool.
-    :param verbose:  (Default value = True)
+    :param verbose:  (Default value = True) Verbose mode of the SQLite engine
 
     """
     global _engine
@@ -128,14 +130,11 @@ def register(username: str, password: str, **kwargs):
 
 @_setup_required
 def authenticate(username: str, password: str, strict=False):
-    """return True or False. If `strict`, raise `NotAuthenticatedError`."""
+    """Return True or False. If `strict`, raise `NotAuthenticatedError`."""
     session = _Session()
     req_user = session.query(User).filter_by(username=username).first()
-    try:
-        result = req_user.password == algorithm(
-            bytes(req_user.salt * salting + password, "utf-8")).hexdigest()
-    except AttributeError:
-        raise UserNotFoundError
+    result = req_user.password == algorithm(
+        bytes(req_user.salt * salting + password, "utf-8")).hexdigest()
     if strict:
         if result:
             return True
@@ -145,15 +144,19 @@ def authenticate(username: str, password: str, strict=False):
 
 
 @_setup_required
-def get(username: str):
+def get(username: str, strict=True):
+    """Get user, authenticated by username. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None."""
     session = _Session()
     result = session.query(User).filter_by(username=username).first()
     session.close()
+    if result == None and strict:
+        raise UserNotFoundError(f"'{username}' not found.")
     return result
 
 
 @_setup_required
 def get_all():
+    """Return a list of all user objects in the database."""
     session = _Session()
     result = session.query(User).all()
     session.close()
