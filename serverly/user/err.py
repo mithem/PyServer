@@ -1,4 +1,4 @@
-class NotAuthenticatedError(Exception):
+class NotAuthorizedError(Exception):
     pass
 
 

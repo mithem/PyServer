@@ -42,7 +42,7 @@ def _api_authenticate(req: Request):
             response = _RES_406
         except err.UserNotFoundError as e:
             response = Response(404, body=str(e))
-        except err.NotAuthenticatedError:
+        except err.NotAuthorizedError:
             response = Response(401, body="Not authorized.")
         except Exception as e:
             serverly.logger.handle_exception(e)
@@ -50,7 +50,7 @@ def _api_authenticate(req: Request):
     # not merging these two caus a duplicate registration *needs* to tell that a certain username is already taken
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
-    except err.NotAuthenticatedError:
+    except err.NotAuthorizedError:
         response = Response(401, body="Not authorized.")
     except Exception as e:
         response = Response(500, body=str(e))
@@ -68,7 +68,7 @@ def _api_change(req: Request):
         response = Response(401, {"WWW-Authenticate": "Basic"})
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
-    except err.NotAuthenticatedError:
+    except err.NotAuthorizedError:
         response = Response(401, body="Not authorized")
     except err.MissingParameterError:
         response = _RES_406
@@ -90,7 +90,7 @@ def _api_delete(req: Request):
             response = _RES_406
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
-    except err.NotAuthenticatedError:
+    except err.NotAuthorizedError:
         response = Response(401)
     except Exception as e:
         response = Response(500, body=str(e))
@@ -112,7 +112,7 @@ def _api_get(req: Request):
             response = _RES_406
     except err.UserNotFoundError as e:
         response = Response(404, body=str(e))
-    except err.NotAuthenticatedError:
+    except err.NotAuthorizedError:
         response = Response(401)
     except Exception as e:
         serverly.logger.handle_exception(e)

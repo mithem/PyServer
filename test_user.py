@@ -88,7 +88,7 @@ def test_authenticate():  # TODO whats wrong with this?
         assert user.authenticate("temporary", "temporary", True)
     except user.UserNotFoundError:
         pass  # if this test is run seperately, authenticate will not find the user
-    with pytest.raises(user.NotAuthenticatedError):
+    with pytest.raises(user.NotAuthorizedError):
         user.authenticate("temporary", "notcorrect")
 
 

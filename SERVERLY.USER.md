@@ -96,7 +96,7 @@ Raises:
 
 ### authenticate()
 
-Return True or False. Required parameters are `username` and `password`. If `strict`, raise `NotAuthenticatedError`.
+Return True or False. Required parameters are `username` and `password`. If `strict`, raise `NotAuthorizedError`.
 
 Examples:
 
@@ -112,7 +112,7 @@ UserNotFoundError: 'other_user' not found.
 True
 >>>serverly.user.authenticate('new_user', 'wrong', strict=True)
 Traceback...
-NotAuthenticatedError
+NotAuthorizedError
 ```
 
 Raises:

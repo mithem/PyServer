@@ -3,7 +3,7 @@ import hashlib
 from functools import wraps
 
 import sqlalchemy
-from serverly.user.err import (NotAuthenticatedError, UserAlreadyExistsError,
+from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError)
 from serverly.objects import DBObject
 from serverly.utils import ranstr
@@ -130,7 +130,7 @@ def register(username: str, password: str, **kwargs):
 
 @_setup_required
 def authenticate(username: str, password: str, strict=False):
-    """Return True or False. If `strict`, raise `NotAuthenticatedError`."""
+    """Return True or False. If `strict`, raise `NotAuthorizedError`."""
     session = _Session()
     req_user = session.query(User).filter_by(username=username).first()
     result = req_user.password == algorithm(
@@ -139,7 +139,7 @@ def authenticate(username: str, password: str, strict=False):
         if result:
             return True
         else:
-            raise NotAuthenticatedError
+            raise NotAuthorizedError
     return result
 
 
