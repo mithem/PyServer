@@ -230,6 +230,22 @@ class StaticSite:
         return content
 
 
+def _verify_user(req: Request):
+    try:
+        with open("pending_verifications.json", "r") as f:
+            data = json.load(f)
+        identifier = req.path.path.split("/")[-1]
+        username = data[identifier]
+        import serverly.user.mail
+        serverly.user.mail.verify(username)
+        del data[identifier]
+        with open("pending_verifications.json", "w") as f:
+            json.dump(data, f)
+        return Response(body="You're verified 🎉")
+    except KeyError:
+        return Response(404, body="Sorry, but the verification code seems to be invalid.")
+
+
 class Sitemap:
     def __init__(self, superpath: str = "/", error_page: dict = None):
         """
@@ -243,7 +259,8 @@ class Sitemap:
         check_relative_path(superpath)
         self.superpath = superpath
         self.methods = {
-            "get": {},
+            # for verifying users of serverly.user and serverly.user.mail
+            "get": {"^/verify/[\w0-9]+": _verify_user},
             "post": {},
             "put": {},
             "delete": {}

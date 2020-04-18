@@ -54,14 +54,19 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
     :param use_salting:  (Default value = True) Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure.
     :param filename:  (Default value = "serverly_users.db") Filename of the SQLite database.
-    :param user_columns:  (Default value = {}) Attributes of a user, additionally to `id`, `username`, `password`and `salt` (which will not be used if not specified so). Example: ```python
+    :param user_columns:  (Default value = {}) Attributes of a user, additionally to `id`, `username`, `password`and `salt` (which will not be used if not specified so). You can use tuples to specify a default value in the second item. 
+
+    Example: 
+
+    ```python
     {
         'first_name': str,
         'last_name': str,
         'email': str,
         'birth_year': int,
         'gdp': float,
-        'newsletter': bool
+        'newsletter': (bool, False),
+        'verified': (bool, False)
     }
     ```
     Supported types are str, float, int, bytes, bool.
@@ -82,8 +87,12 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     }
     for attribute_name, python_type in user_columns.items():
         try:
-            setattr(User, attribute_name, Column(
-                python_types_to_sqlalchemy_types[python_type]))
+            if type(python_type) != tuple:
+                setattr(User, attribute_name, Column(
+                    python_types_to_sqlalchemy_types[python_type]))
+            else:
+                setattr(User, attribute_name, Column(
+                    python_types_to_sqlalchemy_types[python_type[0]], default=python_type[1]))
         except KeyError:
             raise TypeError(f"'{str(python_type)}' not supported.'")
 
@@ -147,7 +156,7 @@ def authenticate(username: str, password: str, strict=False):
 def get(username: str, strict=True):
     """Get user, authenticated by username. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None."""
     session = _Session()
-    result = session.query(User).filter_by(username=username).first()
+    result: User = session.query(User).filter_by(username=username).first()
     session.close()
     if result == None and strict:
         raise UserNotFoundError(f"'{username}' not found.")

@@ -9,9 +9,10 @@ from serverly.user import err
 
 _RES_406 = Response(
     406, body="Unable to parse required parameters. Expected username, password.")
+verify_mail = False
 
 
-def use(function: str, method: str, path: str):
+def use(function: str, method: str, path: str, mail_verification=False):
     """Serverly comes with builtin API-functions for the following serverly.user functions:
     - authenticate
     - change
@@ -19,7 +20,10 @@ def use(function: str, method: str, path: str):
     - get
     - register
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
+
+    Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
     """
+    global verify_mail
     supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
                        "delete": _api_delete, "get": _api_get, "register": _api_register}
     if not function.lower() in supported_funcs.keys():
@@ -27,6 +31,9 @@ def use(function: str, method: str, path: str):
             "function not supported. Supported are authenticate, change, delete, get, get_all, register")
     serverly._sitemap.register_site(
         method, supported_funcs[function.lower()], path)
+
+    if not verify_mail:
+        verify_mail = mail_verification
 
 
 def _api_authenticate(req: Request):
@@ -124,6 +131,8 @@ def _api_register(req: Request):
     try:
         serverly.user.register(**req.obj)
         response = Response()
+        if verify_mail:
+            serverly.user.mail.send_verification_mail_to(req.obj["username"])
     except (KeyError, AttributeError, TypeError) as e:
         response = _RES_406
     except err.UserAlreadyExistsError as e:
