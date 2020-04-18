@@ -1,5 +1,9 @@
 """Implementation of stater allows you to easily create an overview on which servers are currently running"""
-import stater as st
+try:
+    import stater as st
+except ImportError:
+    raise Exception(
+        "module 'stater' is needed to communicate with the stater server. It's available on PyPi as 'stater'")
 import datetime
 
 server_name: str = None
