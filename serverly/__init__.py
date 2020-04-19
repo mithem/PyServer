@@ -333,7 +333,7 @@ class Sitemap:
         elif callable(site):
             try:
                 content = site(request)
-            except TypeError:
+            except TypeError as e:  # makes debugging easier
                 try:
                     content = site()
                 except TypeError as e:

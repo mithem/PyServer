@@ -1,14 +1,20 @@
 import datetime
 import hashlib
+import string
 from functools import wraps
 
 import sqlalchemy
+from serverly.objects import DBObject, Response
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError)
-from serverly.objects import DBObject
 from serverly.utils import ranstr
-from sqlalchemy import Column, Integer, String, Float, Boolean, Binary
+from sqlalchemy import Binary, Boolean, Column, Float, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
+
+# use these to customize the response of built-in authentication functions like the basic_auth()-decorator
+USER_NOT_FOUND_TMPLT = f"User $e"
+UNAUTHORIZED_TMPLT = f"Unauthorized."
+NOT_ACCEPTABLE_TMPLT = f"Invalid parameters. Expected at least username and password."
 
 
 Base = declarative_base()
@@ -194,3 +200,32 @@ def delete(username: str):
     session.delete(get(username))
     session.commit()
     session.close()
+
+
+def basic_auth(func):
+    """Use this as a decorator to specify that serverly should automatically look for the authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED. This only works with 'Basic' authentication"""
+    @wraps(func)
+    def wrapper(request, *args, **kwargs):
+        try:
+            if request.auth_type.lower() == "basic":
+                request.user = get(request.user_cred[0])
+                authenticate(request.user_cred[0], request.user_cred[1], True)
+        except (AttributeError, NotAuthorizedError) as e:
+            s = {"e": str(e)}
+            if e.__class__ == AttributeError:
+                header = {"WWW-Authenticate": "Basic"}
+            else:
+                header = {}
+                s = {**get(request.user_cred[0]).to_dict(), **s}
+            temp = string.Template(UNAUTHORIZED_TMPLT)
+            msg = temp.substitute(s)
+            return Response(401, header, msg)
+        except UserNotFoundError as e:
+            temp = string.Template(USER_NOT_FOUND_TMPLT)
+            msg = temp.substitute(
+                e=str(e))
+            return Response(404, body=msg)
+        except Exception as e:
+            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+        return func(request, *args, **kwargs)
+    return wrapper
