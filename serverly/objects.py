@@ -1,5 +1,6 @@
 import base64
 import collections.abc
+import datetime
 import json as jsonjson
 import urllib.parse
 import warnings
@@ -15,7 +16,16 @@ class DBObject:
         d = {}
         for i in dir(self):
             if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict":
-                d[i] = getattr(self, i)
+                a = getattr(self, i)
+                # json-serializable
+                if type(a) == str or type(a) == int or type(a) == float or type(a) == dict or type(a) == list:
+                    d[i] = a
+                elif issubclass(type(a), DBObject):
+                    d[i] = a.to_dict()
+                elif isinstance(a, datetime.datetime):
+                    d[i] = a.isoformat()
+                else:
+                    d[i] = str(a)
         return d
 
 

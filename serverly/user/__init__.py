@@ -4,17 +4,21 @@ import string
 from functools import wraps
 
 import sqlalchemy
+import serverly
 from serverly.objects import DBObject, Response
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError)
 from serverly.utils import ranstr
-from sqlalchemy import Binary, Boolean, Column, Float, Integer, String
+from sqlalchemy import Binary, Boolean, Column, Float, Integer, String, DateTime, Interval
 from sqlalchemy.ext.declarative import declarative_base
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
 USER_NOT_FOUND_TMPLT = f"User $e"
 UNAUTHORIZED_TMPLT = f"Unauthorized."
 NOT_ACCEPTABLE_TMPLT = f"Invalid parameters. Expected at least username and password."
+
+# number of seconds after which a new session will be created instead of increasing the end value
+session_renew_treshold = 60
 
 
 Base = declarative_base()
@@ -35,6 +39,25 @@ class User(Base, DBObject):
                 result += i + "=" + str(getattr(self, i)) + ", "
         result = result[:-2] + ")>"
         return result
+
+
+class Session(Base, DBObject):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String)
+    start = Column(DateTime)
+    end = Column(DateTime)
+    address = Column(String)
+
+    @property
+    def length(self):
+        """Timedelta object of the session"""
+        result: datetime.timedelta = self.end - self.start
+        return result
+
+    def __str__(self):
+        return f"<Session(username={self.username}, start={str(self.start)}, end={str(self.end)}, length={str(self.length)}, address={self.address})"
 
 
 def mockup_hash_algorithm(data: bytes):
@@ -60,9 +83,9 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
     :param use_salting:  (Default value = True) Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure.
     :param filename:  (Default value = "serverly_users.db") Filename of the SQLite database.
-    :param user_columns:  (Default value = {}) Attributes of a user, additionally to `id`, `username`, `password`and `salt` (which will not be used if not specified so). You can use tuples to specify a default value in the second item. 
+    :param user_columns:  (Default value = {}) Attributes of a user, additionally to `id`, `username`, `password`and `salt` (which will not be used if not specified so). You can use tuples to specify a default value in the second item.
 
-    Example: 
+    Example:
 
     ```python
     {
@@ -75,7 +98,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
         'verified': (bool, False)
     }
     ```
-    Supported types are str, float, int, bytes, bool.
+    Supported types are str, float, int, bytes, bool, datetime.datetime, datetime.timedelta.
     :param verbose:  (Default value = True) Verbose mode of the SQLite engine
 
     """
@@ -89,7 +112,9 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
         float: Float,
         int: Integer,
         bytes: Binary,
-        bool: Boolean
+        bool: Boolean,
+        datetime.datetime: DateTime,
+        datetime.timedelta: Interval
     }
     for attribute_name, python_type in user_columns.items():
         try:
@@ -196,10 +221,82 @@ def change(username: str, new_username: str = None, password: str = None, **kwar
 
 @_setup_required
 def delete(username: str):
+    """Delete user permanently."""
     session = _Session()
     session.delete(get(username))
     session.commit()
     session.close()
+
+
+@_setup_required
+def delete_all():
+    """Delete all users permanently."""
+    session = _Session()
+    session.query(User).delete()
+    session.commit()
+    session.close()
+
+
+@_setup_required
+def get_all_sessions(username: str):
+    """Return all sessions for `username`. `username`=None -> Return all sessions of all users"""
+    session = _Session()
+    result = session.query(Session).filter_by(username=username).all() if type(
+        username) == str else session.query(Session).all()
+    session.close()
+    return result
+
+
+@_setup_required
+def get_last_session(username: str):
+    session = _Session()
+    result: Session = session.query(
+        Session).filter_by(username=username).first()
+    session.close()
+    return result
+
+
+@_setup_required
+def extend_session(id, new_end: datetime.datetime):
+    session = _Session()
+    s: Session = session.query(Session).filter_by(id=id).first()
+    s.end = new_end
+    session.commit()
+
+
+@_setup_required
+def new_activity(username: str, address: tuple):
+    """Update sessions to reflect a new user activity"""
+    def create_new():
+        session = _Session()
+        new = Session()
+        new.username = username
+        new.start = n
+        new.end = n + datetime.timedelta(seconds=10)
+        new.address = f"{address[0]}:{address[1]}"
+        session.add(new)
+        session.commit()
+    n = datetime.datetime.now()
+    last = get_last_session(username)
+    try:
+        if last.end + datetime.timedelta(seconds=session_renew_treshold) < n:
+            extend_session(last.id, n)
+        else:
+            create_new()
+    except AttributeError as e:
+        create_new()
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+
+
+@_setup_required
+def delete_sessions(username: str):
+    """Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable."""
+    session = _Session()
+    if username == None:
+        session.query(Session).delete()
+    else:  # is that necessary?
+        session.query(Session).filter_by(username=username).delete()
 
 
 def basic_auth(func):

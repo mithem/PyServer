@@ -6,6 +6,7 @@ import serverly
 import serverly.utils
 from serverly import Request, Response, error_response
 from serverly.user import err
+import serverly.user
 
 _RES_406 = Response(
     406, body="Unable to parse required parameters. Expected username, password.")
@@ -19,16 +20,19 @@ def use(function: str, method: str, path: str, mail_verification=False):
     - delete
     - get
     - register
+    - sessions.post (create new session or append to existing one)
+    - sessions.get (get all sessions of user)
+    - sessions.delete (delete all sessions of user)
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
 
     Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
     """
     global verify_mail
     supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
-                       "delete": _api_delete, "get": _api_get, "register": _api_register}
+                       "delete": _api_delete, "get": _api_get, "register": _api_register, "sessions.post": _api_sessions_post, "sessions.get": _api_sessions_get, "sessions.delete": _api_sessions_delete}
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
-            "function not supported. Supported are authenticate, change, delete, get, get_all, register")
+            "function not supported. Supported are " + ", ".join(supported_funcs.keys()) + ".")
     serverly._sitemap.register_site(
         method, supported_funcs[function.lower()], path)
 
@@ -141,3 +145,24 @@ def _api_register(req: Request):
         serverly.logger.handle_exception(e)
         response = Response(500, body=str(e))
     return response
+
+
+@serverly.user.basic_auth
+def _api_sessions_post(req: Request):
+    serverly.user.new_activity(req.user.username, req.address)
+    return Response()
+
+
+@serverly.user.basic_auth
+def _api_sessions_get(req: Request):
+    ses = serverly.user.get_all_sessions(req.user.username)
+    sessions = [s.to_dict()
+                for s in ses]
+    response = Response(body=sessions)
+    return response
+
+
+@serverly.user.basic_auth
+def _api_sessions_delete(req: Request):
+    serverly.user.delete_sessions(req.user.username)
+    return Response()

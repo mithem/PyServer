@@ -28,6 +28,7 @@ You recently signed up for our service. Please click the <a href="$verification_
 """
 
 
+online_url = None
 email_address = None
 account_password = None
 verification_subject = None
@@ -38,8 +39,8 @@ def _setup_complete():
     return yag != None and mail_avail == True and email_address != None and account_password != None
 
 
-def setup(email: str = None, password: str = None, email_verification_subject=None, email_verification_template=None):
-    global yag, email_address, account_password, verification_subject, verification_template
+def setup(email: str = None, password: str = None, url=None, email_verification_subject=None, email_verification_template=None):
+    global yag, email_address, account_password, online_url, verification_subject, verification_template
     email_address = email
     account_password = password
     if email_verification_subject == None:

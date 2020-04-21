@@ -85,8 +85,13 @@ def guess_response_info(content: str):
     return {"Content-type": c_type, "Content-Length": len(content)}
 
 
-def clean_user_object(user):
-    new = copy.deepcopy(user)
-    del new.salt
-    del new.password
-    return new
+def clean_user_object(user_s):
+    """return cleaned version of object passed in. user_s can be of type User or list[User]."""
+    def clean(u):
+        new = copy.deepcopy(u)
+        del new.salt
+        del new.password
+        return new
+    if type(user_s) == list:
+        return [clean(u).to_dict() for u in user_s]
+    return clean(user_s)
