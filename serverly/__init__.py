@@ -16,7 +16,7 @@ Methods
 --
 `static_page(file_path, path)` register a static page while the file is located under `file_path` and will serve `path`
 
-`register(func, path: str)` 
+`register(func, path: str)`
 
 `unregister(method: str, path: str)`unregister any page (static or dynamic). Only affect the `method`-path (GET / POST)
 
@@ -36,6 +36,7 @@ This will return "Hello World!" with a status code of 200, as plain text to the 
 """
 import importlib
 import mimetypes
+import multiprocessing
 import re
 import urllib.parse as parse
 import warnings
@@ -43,9 +44,8 @@ from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Union
 
-from fileloghelper import Logger
-
 import serverly.stater
+from fileloghelper import Logger
 from serverly import default_sites
 from serverly.objects import Request, Response
 from serverly.utils import *
@@ -454,12 +454,31 @@ def unregister(method: str, path: str):
     _sitemap.unregister_site(method, path)
 
 
-def start(superpath: str = '/'):
-    """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
-    logger.autosave = True
+def _start_server(superpath: str):
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
+
+
+def start(superpath: str = '/', mail_active=False):
+    """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
+    try:
+        logger.autosave = True
+        server = multiprocessing.Process(
+            target=_start_server, args=(superpath))
+        if mail_active:
+            import serverly.user.mail
+            mail_manager = multiprocessing.Process(
+                target=serverly.user.mail._manager.start)
+            mail_manager.start()
+        server.start()
+    except KeyboardInterrupt:
+        try:
+            del _server
+            server.join()
+            mail_manager.join()
+        except Exception as e:
+            logger.handle_exception(e)
 
 
 def register_error_response(code: int, msg_base: str, mode="enumerate"):

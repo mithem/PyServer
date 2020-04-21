@@ -1,126 +1,182 @@
-from functools import wraps
 import json
+import multiprocessing
+import re
 import string
+import time
+from functools import wraps
+
+import serverly
+import yagmail
+import datetime
 
 
-if __name__ != "__main__":
-    import serverly
-    from serverly.utils import ranstr
-try:
-    import yagmail
-    yag = None
-    mail_avail = True
-except ImportError as e:
-    mail_avail = False
-    try:
-        raise ImportError(
-            "Module 'yagmail' cannot be importet. You cannot use serverly.user.mail.")
-    except ImportError as e:
-        serverly.logger.handle_exception(e)
-except Exception as e:
-    mail_avail = False
-    serverly.logger.handle_exception(e)
+class MailManager:
+    def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = ""):
+        self._email_address = None
+        self._email_password = None
+        self._verification_subject = None
+        self._verification_template = None
+        self._online_url = None
 
-_VERIFICATION_SUBJECT = "Your recent registration"
-_VERIFICATION_TEMPLATE = """Hey $username,
-You recently signed up for our service. Please click the <a href="$verification_url">this link</a> to verify your email 😊.
-(In case you cannot click the link above, you can also copy/paste it: $verification_url)
-"""
+        self.email_address = email_address
+        self.email_password = email_password
+        self.verification_subject = verification_subject
+        self.verification_template = verification_template
+        self.online_url = online_url
+        self.pending, self.scheduled = self._load()
 
+    def _renew_yagmail_smtp(self):
+        self.yag = yagmail.SMTP(self.email_address, self.email_password)
 
-online_url = None
-email_address = None
-account_password = None
-verification_subject = None
-verification_template = None
+    @property
+    def email_address(self):
+        return self._email_address
 
+    @email_address.setter
+    def email_address(self, new_email):
+        email_pattern = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        if not re.match(email_pattern, str(new_email)):
+            raise ValueError("Email appears to be invalid.")
+        self._email_address = str(new_email)
+        self._renew_yagmail_smtp()
 
-def _setup_complete():
-    return yag != None and mail_avail == True and email_address != None and account_password != None
+    @property
+    def email_password(self):
+        return self._email_password
 
+    @email_password.setter
+    def email_password(self, new_password):
+        self._email_password = str(new_password)
+        self._renew_yagmail_smtp()
 
-def setup(email: str = None, password: str = None, url=None, email_verification_subject=None, email_verification_template=None):
-    global yag, email_address, account_password, online_url, verification_subject, verification_template
-    email_address = email
-    account_password = password
-    if email_verification_subject == None:
-        verification_subject = _VERIFICATION_SUBJECT
-    else:
-        verification_subject = email_verification_subject
-    if email_verification_template == None:
-        verification_template = _VERIFICATION_TEMPLATE
-    else:
-        verification_template = email_verification_template
-    yag = yagmail.SMTP(email_address, password)
+    @property
+    def verification_subject(self):
+        return self._verification_subject
 
+    @verification_subject.setter
+    def verification_subject(self, verification_subject: str):
+        self._verification_subject = str(verification_subject) if type(
+            verification_subject) != None else None
 
-def _full_setup_required(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if _setup_complete():
-            return func(*args, **kwargs)
+    @property
+    def verification_template(self):
+        return self._verification_template
+
+    @verification_template.setter
+    def verification_template(self, verification_template: str):
+        self._verification_template = str(verification_template) if type(
+            verification_template) != None else None
+
+    @property
+    def online_url(self):
+        return self._online_url
+
+    @online_url.setter
+    def online_url(self, online_url: str):
+        url_pattern = r"https?: \/\/(www\.)?[-a-zA-Z0-9@: % ._\+ ~  # =]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        if not re.match(url_pattern, str(online_url)) and not online_url == "":
+            raise ValueError("Online_url appears to be invalid.")
+        self._online_url = str(online_url)
+
+    def send(self, subject: str, content="", attachments=None, username: str = None, email: str = None):
+        """send email immediately and without multiprocessing"""
+        if username != None:
+            email = serverly.user.get(str(username)).email
+        elif email == None:
+            return serverly.logger.warning("Cannot send email: Neither username nor email provieded.", extra_context="MAIL")
+        self.yag.send(email, subject, content, attachments)
+
+    def schedule(self, email: dict, immedieately=False, **kwargs):
+        # TODO: make robust
         try:
-            raise UserWarning(
-                "Mail client (gmail) not set up. Use serverly.user.mail.setup() to do.")
+            if immedieately:
+                self.pending.append(email)
+            else:
+                self.scheduled.append(email)
+            self._save()
         except Exception as e:
             serverly.logger.handle_exception(e)
-    return wrapper
 
-
-def verify(username: str):
-    serverly.user.change(username, verified=True)
-    serverly.logger.success(f"verified email of {username}!")
-
-
-@_full_setup_required
-def send_verification_mail_to(username: str):
-    try:
-        identifier = ranstr()
-        verification_url = "/SUPERPATH/verify/" + identifier
-        substitutions = {**serverly.user.get(username).to_dict(),
-                         **{"verification_url": verification_url}}
-        for key, value in substitutions.items():
-            substitutions[key] = str(value)
-
-        subject_temp = string.Template(verification_subject)
-        content_temp = string.Template(verification_template)
-
-        subject = subject_temp.substitute(substitutions)
-        content = content_temp.substitute(substitutions)
-
+    def _load(self):
+        """return pending: list, scheduled: list emails as a tuple"""
         try:
-            send(username, subject, content)
+            with open("mails.json", "r") as f:
+                data = json.load(f)
+            for obj in data["scheduled"]:
+                obj["schedule"] = datetime.datetime.fromisoformat(
+                    obj["schedule"])
+            return data["pending"], data["scheduled"]
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            return [], []
+
+    def _save(self):
+        with open("mails.json", "w+") as f:
+            json.dump({"pending": self.pending,
+                       "scheduled": self.scheduled}, f)
+
+    def send_pending(self):
+        processes = []
+        for mail in self.pending:
+            def send():
+                self.send(mail["subject"], mail.get("content", ""),
+                          mail.get("attachments", None), mail.get("username", None), mail.get("email", None))
+                self.pending.pop(self.pending.index(mail))
+            processes.append(multiprocessing.Process(target=send, args=(mail["subject"], mail.get(
+                "content", None), mail.get("attachments", None), mail.get("username", None), mail.get("email", None)), name="Sending of email"))
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join()
+
+    def send_scheduled(self):
+        processes = []
+        for mail in self.scheduled:
+            def send():
+                self.send(mail["subject"], mail.get("content", ""),
+                          mail.get("attachments", None), mail.get("username", None), mail.get("email", None))
+                self.scheduled.pop(self.scheduled.index(mail))
+            if datetime.datetime.now() >= mail["schedule"]:
+                processes.append(multiprocessing.Process(target=send))
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join()
+
+    def start(self):
+        def pending():
             try:
-                with open("pending_verifications.json", "r") as f:
-                    try:
-                        data = json.load(f)
-                    except:
-                        data = {}
-            except FileNotFoundError:
-                with open("pending_verifications.json", "w+") as f:
-                    data = {}
-                    f.write("{}")
-            data[identifier] = username
-            with open("pending_verifications.json", "w") as f:
-                json.dump(data, f)
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-    except Exception as e:
-        serverly.logger.handle_exception(e)
-        raise e
+                while True:
+                    self.send_pending()
+                    print("Sent all pending!!!")
+                    time.sleep(60)
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print("EXCEPTION " + str(type(e)) + "\n" + str(e))
+
+        def scheduled():
+            try:
+                while True:
+                    self.send_scheduled()
+                    print("Sent all scheduled!!!")
+                    time.sleep(30)
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print("EXCEPTION " + str(type(e)) + "\n" + str(e))
+
+        pending_handler = multiprocessing.Process(
+            target=pending, name="MailManager: Pending")
+        scheduled_handler = multiprocessing.Process(
+            target=scheduled, name="Mailmanager: Scheduled")
+
+        pending_handler.start()
+        scheduled_handler.start()
 
 
-def get_email_from_username(username: str):
-    user = serverly.user.get(username)
-    return str(user.email)
+manager: MailManager = None
 
 
-@_full_setup_required
-def send(username: str, subject: str, message="", attachments=None):
-    try:
-        email = get_email_from_username(username)
-        yag.send(to=email, subject=str(subject),
-                 contents=str(message), attachments=attachments)
-        serverly.logger.success(f"Sent mail to {username} ({email}).")
-    except Exception as e:
-        serverly.logger.handle_exception(e)
+def setup(email_address: str, email_password):  # TODO other paras
+    global manager
+    manager = MailManager(email_address, email_password)
