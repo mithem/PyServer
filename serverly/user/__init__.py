@@ -300,14 +300,16 @@ def delete_sessions(username: str):
 
 
 def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED. This only works with 'Basic' authentication"""
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
     @wraps(func)
     def wrapper(request, *args, **kwargs):
         try:
             if request.auth_type.lower() == "basic":
                 request.user = get(request.user_cred[0])
                 authenticate(request.user_cred[0], request.user_cred[1], True)
+                print("authenticated!")
         except (AttributeError, NotAuthorizedError) as e:
+            print("not authorized!")
             s = {"e": str(e)}
             if e.__class__ == AttributeError:
                 header = {"WWW-Authenticate": "Basic"}
@@ -318,6 +320,7 @@ def basic_auth(func):
             msg = temp.substitute(s)
             return Response(401, header, msg)
         except UserNotFoundError as e:
+            print("user not found!")
             temp = string.Template(USER_NOT_FOUND_TMPLT)
             msg = temp.substitute(
                 e=str(e))
