@@ -57,6 +57,7 @@ version = "0.3.0 (in dev)"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
+error_response_templates = {}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -358,9 +359,6 @@ class Sitemap:
         return response
 
     def get_content(self, request: Request):
-        response_code = 500
-        text = ""
-        info = {}
         site = None
         response = None
         for pattern in self.methods[request.method].keys():
@@ -368,7 +366,6 @@ class Sitemap:
                 site = self.methods[request.method][pattern]
                 break
         if site == None:
-            response_code = 404
             site = self.error_page.get(404, self.error_page[0])
             response = self.get_func_or_site_response(
                 site, request)
@@ -524,6 +521,3 @@ def error_response(code: int, *args):
             f"No template found for code {str(code)}. Please make sure to register them by calling register_error_response.")
     except Exception as e:
         logger.handle_exception(e)
-
-
-error_response_templates = {}
