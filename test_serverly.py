@@ -1,6 +1,7 @@
 import pytest
 import serverly
 import json
+import urllib.parse as parse
 
 print("SERVERLY VERSION v" + serverly.version)
 
@@ -26,9 +27,9 @@ def test_sitemap():
     def hello_world(req):
         return serverly.Response(body="hello world!")
     serverly.register_function("GET", "/", hello_world)
-    r1 = serverly.Request("GET", "/", {}, "", (0, 0))
+    r1 = serverly.Request("GET", parse.urlparse("/"), {}, "", (0, 0))
     r2 = serverly.Request(
-        "GET", "/notavalidurlactuallyitisvalid", {}, "", (0, 0))
+        "GET", parse.urlparse("/notavalidurlactuallyitisvalid"), {}, "", (0, 0))
     assert serverly._sitemap.get_content(r1).body == "hello world!"
     assert "404 - Page not found" in serverly._sitemap.get_content(r2).body
 
@@ -64,7 +65,3 @@ def test_response():
 def test_ranstr():
     for _ in range(100):
         assert len(serverly.utils.ranstr()) == 20
-
-
-if __name__ == "__main__":
-    test_request_2()
