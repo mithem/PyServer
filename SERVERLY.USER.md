@@ -15,6 +15,9 @@ This subpackage allows very easy user-management right through serverly.
   - [change()](#change)
   - [delete()](#delete)
 - [Standard API](#standard-api)
+- [MailManager](#mailmanager)
+  - [Configuration](#mailmanager-configuration)
+  - [Methods](#mailmanager-methods)
 
 ## Configuration
 
@@ -186,3 +189,44 @@ Example:
 Voilà, serverly now listens on the POST endpoint 'api/register'!
 
 Documententation of the standard API, what it accepts, what it returns, etc. is available on [Postman](https://documenter.getpostman.com/view/10720102/Szf549XF?version=latest)
+
+## MailManager
+
+The MailManager (`serverly.user.mail.manager`) allows you to send emails (automatically as well as manually). It only supports **gmail** and you need to enable 'access by less secure app' as serverly does using `yagmail` (you need that too) with OAuth. Using the functions in this module requires that the User object has the attributes `username` (obviously) `email` and `verified`.
+
+You can easily set up the manager (there isn't really a good other way) by calling
+
+```python
+serverly.user.mail.setup(
+    email_address: str,
+    email_password: str,
+    verification_subject_template: str=None,
+    verification_content_template: str=None,
+    online_url="",
+    pending_interval=15,
+    scheduled_interval=15
+)
+```
+
+### MailManager Configuration
+
+| Attribute                  | Description                                                                                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| email_address: str         | Your gmail address                                                                                                                                                                                        |
+| email_password: str        | Your gmail (google) password (No config file for that one 😉; You shall implement that yourself)                                                                                                          |
+| verification_subject: str  | Template (string module's template engine) for the subject of verification mails (when using `send_verification_mail()`and/or the [register() standard api](#standard-api))                               |
+| verification_template: str | Same as above but for the email's content/body                                                                                                                                                            |
+| online_url: str            | URL where the server can be reached (`superpath` **not** included). Will be used to replace `$verification_url` when using `send_verification_mail()` and/or the [register() standard api](#standard-api) |
+| pending_interval: int      |  Interval (seconds) pending (non-scheduled) emails will be tried to send                                                                                                                                  |
+| scheduled_interval: int    |  Interval (seconds) scheduled mails will be sent if they should (see [schedule()](#schedule))                                                                                                             |
+
+### MailManager Methods
+
+| Method                               | Description                                                                                                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| schedule(email={}, immediately=True) | Schedule a new email: dict. 'email' or 'username' as well as 'subject' are required. Use 'schedule': Union[isoformat, datetime.datetime] to schedule it for some time in the future. Required if 'immediately' is False. If 'immediately' is True, send it ASAP. |
+| send_pending()                       |  Usually not needed, but you can call this to send them manually.                                                                                                                                                                                                |
+| send_scheduled()                     |  Same as above                                                                                                                                                                                                                                                   |
+| start()                              | Start the manager. If everything goes right, this will already be done by serverly, so you would just create another worker. I don't think that this would increase the server's capacity though as each mail is sent in another process either way.             |
+| send_verification_mail(username:str) |  Send a verification mail to user specified. Will use `verification_subject` and `verification_template` as a, well, template...                                                                                                                                 |
+| verify()                             | Verify user.                                                                                                                                                                                                                                                     |

@@ -123,7 +123,7 @@ class MailManager:
             serverly.logger.handle_exception(e)
             raise e
 
-    def schedule(self, email: dict = {}, immediately=True):
+    def schedule(self, email={}, immediately=True):
         """schedule a new email: dict. 'email' or 'username' as well as 'subject' are required. Use 'schedule': Union[isoformat, datetime.datetime] to schedule it for some time in the future. Required if 'immediately' is False. If 'immediately' is True, send it ASAP."""
         try:
             self._load()
@@ -261,7 +261,7 @@ class MailManager:
         serverly.logger.context = "startup"
         serverly.logger.success("MailManager started!")
 
-    def send_verification_mail(self, username: str = None, email: str = None):
+    def send_verification_mail(self, username: str):
         try:
             identifier = ranstr()
             verification_url = self.online_url + \
