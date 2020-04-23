@@ -10,9 +10,17 @@ import serverly
 import yagmail
 from serverly.utils import ranstr
 
+_default_verification_subject = "Your recent registration"
+_default_verification_template = """Hey $username,
+thank you for registering for our service. Please click <a href='$verification_url'>this link</a> to verify your email.
+
+If you cannot click the link for some reason, you can also just copy/paste it:
+$verification_url
+"""
+
 
 class MailManager:
-    def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = ""):
+    def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = "", pending_interval=15, scheduled_interval=15):
         self._email_address = None
         self._email_password = None
         self._verification_subject = None
@@ -27,6 +35,9 @@ class MailManager:
 
         self.pending = []
         self.scheduled = []
+
+        self.pending_interval = int(pending_interval)
+        self.scheduled_interval = int(scheduled_interval)
 
     def _renew_yagmail_smtp(self):
         self.yag = yagmail.SMTP(self.email_address, self.email_password)
@@ -54,21 +65,27 @@ class MailManager:
 
     @property
     def verification_subject(self):
-        return self._verification_subject
+        if self._verification_template != None:
+            return str(self._verification_subject)
+        else:
+            return _default_verification_subject
 
     @verification_subject.setter
     def verification_subject(self, verification_subject: str):
-        self._verification_subject = str(verification_subject) if type(
-            verification_subject) != None else None
+        self._verification_subject = str(
+            verification_subject) if verification_subject != None else _default_verification_subject
 
     @property
     def verification_template(self):
-        return self._verification_template
+        if self._verification_template != None:
+            return str(self._verification_template)
+        else:
+            return _default_verification_template
 
     @verification_template.setter
     def verification_template(self, verification_template: str):
-        self._verification_template = str(verification_template) if type(
-            verification_template) != None else None
+        self._verification_template = str(
+            verification_template) if verification_template != None else _default_verification_template
 
     @property
     def online_url(self):
@@ -76,31 +93,49 @@ class MailManager:
 
     @online_url.setter
     def online_url(self, online_url: str):
-        url_pattern = r"https?: \/\/(www\.)?[-a-zA-Z0-9@: % ._\+ ~  # =]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        url_pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~# =]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
         if not re.match(url_pattern, str(online_url)) and not online_url == "":
             raise ValueError("Online_url appears to be invalid.")
         self._online_url = str(online_url)
 
-    def send(self, subject: str, content="", attachments=None, username: str = None, email: str = None):
-        """send email immediately and without multiprocessing"""
-        if username != None:
-            email = serverly.user.get(str(username)).email
-        elif email == None:
-            return serverly.logger.warning("Cannot send email: Neither username nor email provieded.", extra_context="MAIL")
-        self.yag.send(email, subject, content, attachments)
-        serverly.logger.success(f"Sent email to {email}!")
+    def send(self, subject: str, content="", attachments=None, username: str = None, email: str = None, substitute=False):
+        """send email immediately and without multiprocessing. If `substitue`, substitute user attributes with the string library's template engine."""
+        try:
+            if username != None:
+                user = serverly.user.get(str(username))
+            elif email == None:
+                return serverly.logger.warning("Cannot send email: Neither username nor email provided.", extra_context="MailManager")
+            else:
+                user = serverly.user.get_by_email(email)
+            if substitute:
+                subject_temp = string.Template(subject)
+                content_temp = string.Template(content)
 
-    def schedule(self, email: dict, immedieately=False, **kwargs):
-        # TODO: make robust
+                d = user.to_dict()
+
+                subject = subject_temp.safe_substitute(**d)
+                content = content_temp.safe_substitute(**d)
+
+            self.yag.send(email, subject, content, attachments)
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            serverly.logger.handle_exception(e)
+            raise e
+
+    def schedule(self, email: dict = {}, immediately=True):
+        """schedule a new email: dict. 'email' or 'username' as well as 'subject' are required. Use 'schedule': Union[isoformat, datetime.datetime] to schedule it for some time in the future. Required if 'immediately' is False. If 'immediately' is True, send it ASAP."""
         try:
             self._load()
-            if immedieately:
+            if immediately:
                 self.pending.append(email)
-                self.send_pending()
             else:
                 if type(email["schedule"]) == str:
                     email["schedule"] = datetime.datetime.fromisoformat(
                         email["schedule"])
+                elif type(email["schedule"]) != datetime.datetime:
+                    raise TypeError(
+                        "email['schedule'] not an isoformat str or datetime.datetime object")
                 self.scheduled.append(email)
             self._save()
         except Exception as e:
@@ -132,26 +167,30 @@ class MailManager:
                 json.dump({"pending": self.pending,
                            "scheduled": scheduled}, f)
         except Exception as e:
-            print("EXCEPTION")
-            print(e)
+            serverly.logger.handle_exception(e)
 
     def send_pending(self):
         try:
             self._load()
-            print("PENDING: ", self.pending)
             processes = []
             for mail in self.pending:
                 def send():
-                    self.send(mail["subject"], mail.get("content", ""),
-                              mail.get("attachments", None), mail.get("username", None), mail.get("email", None))
-                    self.pending.pop(self.pending.index(mail))
-                    self._save()
+                    try:
+                        self.send(mail["subject"], mail.get("content", ""),
+                                  mail.get("attachments", None), mail.get("username", None), mail.get("email", None), True)
+                        self.pending.pop(self.pending.index(mail))
+                        self._save()
+                    except KeyboardInterrupt:
+                        self._save()
                 processes.append(multiprocessing.Process(
                     target=send, name="Sending of email"))
             for process in processes:
                 process.start()
             for process in processes:
                 process.join()
+            return len(processes)
+        except KeyboardInterrupt:
+            self._save()
         except Exception as e:
             self._save()
             raise e
@@ -159,20 +198,25 @@ class MailManager:
     def send_scheduled(self):
         try:
             self._load()
-            print("SCHEDULED: ", self.scheduled)
             processes = []
             for mail in self.scheduled:
                 def send():
-                    self.send(mail["subject"], mail.get("content", ""),
-                              mail.get("attachments", None), mail.get("username", None), mail.get("email", None))
-                    self.scheduled.pop(self.scheduled.index(mail))
-                    self._save()
+                    try:
+                        self.send(mail["subject"], mail.get("content", ""),
+                                  mail.get("attachments", None), mail.get("username", None), mail.get("email", None))
+                        self.scheduled.pop(self.scheduled.index(mail))
+                        self._save()
+                    except KeyboardInterrupt:
+                        self._save()
                 if datetime.datetime.now() >= mail["schedule"]:
                     processes.append(multiprocessing.Process(target=send))
             for process in processes:
                 process.start()
             for process in processes:
                 process.join()
+            return len(processes)
+        except KeyboardInterrupt:
+            self._save()
         except Exception as e:
             self._save()
             raise e
@@ -181,52 +225,63 @@ class MailManager:
         def pending():
             try:
                 while True:
-                    self.send_pending()
-                    print("Sent all pending!!!")
-                    time.sleep(10)
+                    n = self.send_pending()
+                    serverly.logger.context = "MailManager"
+                    serverly.logger.success(
+                        f"Sent {str(n)} pending emails", False)
+                    time.sleep(self.pending_interval)
             except KeyboardInterrupt:
                 self._save()
             except Exception as e:
-                print("EXCEPTION " + str(type(e)) + "\n" + str(e))
+                serverly.logger.handle_exception(e)
 
         def scheduled():
             try:
                 while True:
-                    self.send_scheduled()
-                    print("Sent all scheduled!!!")
-                    time.sleep(10)
+                    n = self.send_scheduled()
+                    serverly.logger.context = "MailManager"
+                    serverly.logger.success(
+                        f"Sent {str(n)} scheduled emails", False)
+                    time.sleep(self.scheduled_interval)
             except KeyboardInterrupt:
                 self._save()
             except Exception as e:
-                print("EXCEPTION " + str(type(e)) + "\n" + str(e))
+                serverly.logger.handle_exception(e)
 
         self._load()
 
         pending_handler = multiprocessing.Process(
             target=pending, name="MailManager: Pending")
         scheduled_handler = multiprocessing.Process(
-            target=scheduled, name="Mailmanager: Scheduled")
+            target=scheduled, name="MailManager: Scheduled")
 
         pending_handler.start()
         scheduled_handler.start()
 
+        serverly.logger.context = "startup"
+        serverly.logger.success("MailManager started!")
+
     def send_verification_mail(self, username: str = None, email: str = None):
         try:
             identifier = ranstr()
-            verification_url = "/SUPERPATH/verify/" + identifier
+            verification_url = self.online_url + \
+                serverly._sitemap.superpath + "verify/" + identifier
             substitutions = {**serverly.user.get(username).to_dict(),
                              **{"verification_url": verification_url}}
             for key, value in substitutions.items():
                 substitutions[key] = str(value)
 
-            subject_temp = string.Template(verification_subject)
-            content_temp = string.Template(verification_template)
+            subject_temp = string.Template(self.verification_subject)
+            content_temp = string.Template(self.verification_template)
 
             subject = subject_temp.substitute(substitutions)
             content = content_temp.substitute(substitutions)
 
+            print("subject:", subject)
+            print("content:", content)
+
             try:
-                send(username, subject, content)
+                self.send(subject, content, username=username)
                 try:
                     with open("pending_verifications.json", "r") as f:
                         try:
@@ -267,6 +322,7 @@ def verify(identifier: str):
 manager: MailManager = None
 
 
-def setup(email_address: str, email_password):  # TODO other paras
+def setup(email_address: str, email_password: str, verification_subject_template: str = None, verification_content_template: str = None, online_url="", pending_interval=15, scheduled_interval=15):
     global manager
-    manager = MailManager(email_address, email_password)
+    manager = MailManager(email_address, email_password, verification_subject_template,
+                          verification_content_template, online_url, pending_interval, scheduled_interval)
