@@ -14,3 +14,4 @@ favicon.ico
 *.html
 *.json
 *.db
+reset.py

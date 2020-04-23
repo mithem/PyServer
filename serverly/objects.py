@@ -18,7 +18,7 @@ class DBObject:
             if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict":
                 a = getattr(self, i)
                 # json-serializable
-                if type(a) == str or type(a) == int or type(a) == float or type(a) == dict or type(a) == list:
+                if type(a) == str or type(a) == int or type(a) == float or type(a) == dict or type(a) == list or type(a) == bool:
                     d[i] = a
                 elif issubclass(type(a), DBObject):
                     d[i] = a.to_dict()
