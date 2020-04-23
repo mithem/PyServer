@@ -53,7 +53,7 @@ from serverly.utils import *
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
-version = "0.2.11"
+version = "0.3.0 (in dev)"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -449,7 +449,6 @@ def unregister(method: str, path: str):
 
 
 def _start_server(superpath: str):
-    print("SERVER STARTUP (_start_server)")
     _sitemap.superpath = superpath
     _server = Server(address)
     _server.run()
@@ -457,14 +456,12 @@ def _start_server(superpath: str):
 
 def start(superpath: str = '/', mail_active=False):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
-    print("STARTING")
     try:
         logger.autosave = True
         server = multiprocessing.Process(
             target=_start_server, args=(superpath))
         if mail_active:
             import serverly.user.mail
-            print("PREPARING TO START MAIL SERVER")
             mail_manager = multiprocessing.Process(
                 target=serverly.user.mail.manager.start)
             mail_manager.start()
