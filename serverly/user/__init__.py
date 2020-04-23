@@ -169,12 +169,14 @@ def register(username: str, password: str, **kwargs):
 
 
 @_setup_required
-def authenticate(username: str, password: str, strict=False):
-    """Return True or False. If `strict`, raise `NotAuthorizedError`."""
+def authenticate(username: str, password: str, strict=False, verified=False):
+    """Return True or False. If `strict`, raise `NotAuthorizedError`. If `verified`, the user also has to be verified (requires email)"""
     session = _Session()
     req_user = session.query(User).filter_by(username=username).first()
     result = req_user.password == algorithm(
         bytes(req_user.salt * salting + password, "utf-8")).hexdigest()
+    if verified:
+        result = result and req_user.verified
     if strict:
         if result:
             return True
@@ -191,6 +193,17 @@ def get(username: str, strict=True):
     session.close()
     if result == None and strict:
         raise UserNotFoundError(f"'{username}' not found.")
+    return result
+
+
+@_setup_required
+def get_by_email(email: str, strict=True):
+    """Get user with `email`. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None."""
+    session = _Session()
+    result: User = session.query(User).filter_by(email=email).first()
+    session.close()
+    if result == None and strict:
+        raise UserNotFoundError(f"User with email '{email}' not found.")
     return result
 
 
@@ -300,7 +313,9 @@ def delete_sessions(username: str):
 
 
 def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED.
+
+    Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
     @wraps(func)
     def wrapper(request, *args, **kwargs):
         try:
