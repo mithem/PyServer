@@ -455,8 +455,9 @@ def start(superpath: str = '/', mail_active=False):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     try:
         logger.autosave = True
+        args = tuple([superpath])
         server = multiprocessing.Process(
-            target=_start_server, args=(superpath))
+            target=_start_server, args=args)
         if mail_active:
             import serverly.user.mail
             mail_manager = multiprocessing.Process(
