@@ -18,6 +18,7 @@ This subpackage allows very easy user-management right through serverly.
 - [MailManager](#mailmanager)
   - [Configuration](#mailmanager-configuration)
   - [Methods](#mailmanager-methods)
+- [Sessions](#sessions)
 
 ## Configuration
 
@@ -230,3 +231,5 @@ serverly.user.mail.setup(
 | start()                              | Start the manager. If everything goes right, this will already be done by serverly, so you would just create another worker. I don't think that this would increase the server's capacity though as each mail is sent in another process either way.             |
 | send_verification_mail(username:str) |  Send a verification mail to user specified. Will use `verification_subject` and `verification_template` as a, well, template...                                                                                                                                 |
 | verify()                             | Verify user.                                                                                                                                                                                                                                                     |
+
+## Sessions
