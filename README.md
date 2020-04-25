@@ -1,4 +1,4 @@
-![test](https://github.com/mithem/serverly/workflows/Test%20with%20pytest/badge.svg)
+![pytest](https://github.com/mithem/serverly/workflows/pytest/badge.svg)
 
 # serverly - http.server wrapper and helper
 
