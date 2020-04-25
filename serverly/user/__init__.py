@@ -75,9 +75,10 @@ _engine = None
 _Session = None
 algorithm = None
 salting = 1
+require_verified = False
 
 
-def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False):
+def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False):
     """
 
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
@@ -100,12 +101,14 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     ```
     Supported types are str, float, int, bytes, bool, datetime.datetime, datetime.timedelta.
     :param verbose:  (Default value = True) Verbose mode of the SQLite engine
+    :param require_email_verification: require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example.
 
     """
     global _engine
     global _Session
     global algorithm
     global salting
+    global require_verified
 
     python_types_to_sqlalchemy_types = {
         str: String,
@@ -133,6 +136,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
         "sqlite:///" + filename, echo=verbose)
     Base.metadata.create_all(bind=_engine)
     _Session = sqlalchemy.orm.sessionmaker(bind=_engine)
+    require_verified = require_email_verification
 
 
 def _setup_required(func):
@@ -275,6 +279,7 @@ def extend_session(id, new_end: datetime.datetime):
     s: Session = session.query(Session).filter_by(id=id).first()
     s.end = new_end
     session.commit()
+    session.close()
 
 
 @_setup_required
@@ -310,6 +315,7 @@ def delete_sessions(username: str):
         session.query(Session).delete()
     else:  # is that necessary?
         session.query(Session).filter_by(username=username).delete()
+    session.commit()
 
 
 def basic_auth(func):
@@ -318,13 +324,13 @@ def basic_auth(func):
     Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
     @wraps(func)
     def wrapper(request, *args, **kwargs):
+        global require_verified
         try:
             if request.auth_type.lower() == "basic":
                 request.user = get(request.user_cred[0])
-                authenticate(request.user_cred[0], request.user_cred[1], True)
-                print("authenticated!")
+                authenticate(
+                    request.user_cred[0], request.user_cred[1], True, require_verified)
         except (AttributeError, NotAuthorizedError) as e:
-            print("not authorized!")
             s = {"e": str(e)}
             if e.__class__ == AttributeError:
                 header = {"WWW-Authenticate": "Basic"}
@@ -335,7 +341,6 @@ def basic_auth(func):
             msg = temp.substitute(s)
             return Response(401, header, msg)
         except UserNotFoundError as e:
-            print("user not found!")
             temp = string.Template(USER_NOT_FOUND_TMPLT)
             msg = temp.substitute(
                 e=str(e))
