@@ -1,3 +1,5 @@
+![Test with pytest](https://github.com/mithem/serverly/workflows/Test%20with%20pytest/badge.svg)
+
 # serverly - http.server wrapper and helper
 
 A really simple-to-use HTTP-server!
