@@ -6,15 +6,18 @@ import serverly
 import serverly.utils
 from serverly import Request, Response, error_response
 from serverly.user import err
+from serverly.user import basic_auth
 import serverly.user
+from functools import wraps
 
 _RES_406 = Response(
     406, body="Unable to parse required parameters. Expected username, password.")
 verify_mail = False
 only_user_verified = False
+use_sessions = False
 
 
-def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False):
+def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_user_calls_endpoint=False):
     """Serverly comes with builtin API-functions for the following serverly.user functions:
     - authenticate
     - change
@@ -37,109 +40,56 @@ def use(function: str, method: str, path: str, mail_verification=False, require_
     serverly._sitemap.register_site(
         method, supported_funcs[function.lower()], path)
 
+    global verify_mail, only_user_verified, use_sessions
+
     if mail_verification:
         verify_mail = True
     if require_user_to_be_verified:
         only_user_verified = True
+    if use_sessions_when_user_calls_endpoint:
+        use_sessions = True
 
 
+def _check_to_use_sessions(func):
+    @wraps(func)
+    def wrapper(request, *args, **kwargs):
+        if use_sessions:
+            serverly.user.new_activity(request.user.username, request.address)
+        return func(request, *args, **kwargs)
+    return wrapper
+
+
+@basic_auth
+@_check_to_use_sessions
 def _api_authenticate(req: Request):
-    try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
-        response = Response()
-    except TypeError:
-        try:
-            verified = True if only_user_verified else req.obj.get(
-                "verified", only_user_verified)
-            serverly.user.authenticate(
-                req.obj["username"], req.obj["password"], True, verified)
-            response = Response()
-        except (AttributeError, KeyError, TypeError):
-            response = _RES_406
-        except err.UserNotFoundError as e:
-            response = Response(404, body=str(e))
-        except err.NotAuthorizedError:
-            response = Response(401, body="Not authorized.")
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            response = Response(500, body=str(e))
-    # not merging these two caus a duplicate registration *needs* to tell that a certain username is already taken
-    except err.UserNotFoundError as e:
-        response = Response(404, body=str(e))
-    except err.NotAuthorizedError:
-        response = Response(401, body="Not authorized.")
-    except Exception as e:
-        response = Response(500, body=str(e))
-    return response
+    return Response()
 
 
+@basic_auth
+@_check_to_use_sessions
 def _api_change(req: Request):
-    try:
-        if not req.authenticated:
-            raise err.MissingParameterError
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
-        serverly.user.change(req.user_cred[0], **req.obj)
-        response = Response()
-    except TypeError:
-        response = Response(401, {"WWW-Authenticate": "Basic"})
-    except err.UserNotFoundError as e:
-        response = Response(404, body=str(e))
-    except err.NotAuthorizedError:
-        response = Response(401, body="Not authorized")
-    except err.MissingParameterError:
-        response = _RES_406
-    return response
+    serverly.user.change(req.user_cred[0], **req.obj)
+    return Response()
 
 
+@basic_auth
+@_check_to_use_sessions  # lol
 def _api_delete(req: Request):
-    try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
-        serverly.user.delete(req.user_cred[0])
-        response = Response()
-    except TypeError:
-        try:
-            serverly.user.authenticate(
-                req.obj["username"], req.obj["password"], True)
-            serverly.user.delete(req.obj["username"])
-            response = Response()
-        except (TypeError, KeyError):
-            response = _RES_406
-    except err.UserNotFoundError as e:
-        response = Response(404, body=str(e))
-    except err.NotAuthorizedError:
-        response = Response(401)
-    except Exception as e:
-        response = Response(500, body=str(e))
-    return response
+    serverly.user.delete(req.user.username)
+    return Response()
 
 
+@basic_auth
+@_check_to_use_sessions
 def _api_get(req: Request):
-    try:
-        serverly.user.authenticate(req.user_cred[0], req.user_cred[1], True)
-        user = serverly.user.get(req.user_cred[0])
-        response = Response(body=serverly.utils.clean_user_object(user))
-    except TypeError:
-        try:
-            serverly.user.authenticate(
-                req.obj["username"], req.obj["password"], True)
-            user = serverly.user.get(req.obj["username"])
-            response = Response(body=serverly.utils.clean_user_object(user))
-        except (AttributeError, KeyError, TypeError) as e:
-            response = _RES_406
-    except err.UserNotFoundError as e:
-        response = Response(404, body=str(e))
-    except err.NotAuthorizedError:
-        response = Response(401)
-    except Exception as e:
-        serverly.logger.handle_exception(e)
-        response = Response(500, body=str(e))
-    return response
+    return Response(body=serverly.utils.clean_user_object(req.user))
 
 
-def _api_register(req: Request):
+def _api_register(req: Request):  # cannot use _check_to_use_sessions as it needs a user obj
     try:
         serverly.user.register(**req.obj)
         response = Response()
+        serverly.user.new_activity(req.obj["username"], req.address)
         if verify_mail:
             serverly.user.mail.manager.send_verification_mail(
                 req.obj["username"])
@@ -154,13 +104,13 @@ def _api_register(req: Request):
     return response
 
 
-@serverly.user.basic_auth
+@basic_auth
 def _api_sessions_post(req: Request):
     serverly.user.new_activity(req.user.username, req.address)
     return Response()
 
 
-@serverly.user.basic_auth
+@basic_auth
 def _api_sessions_get(req: Request):
     ses = serverly.user.get_all_sessions(req.user.username)
     sessions = [s.to_dict()
@@ -169,7 +119,7 @@ def _api_sessions_get(req: Request):
     return response
 
 
-@serverly.user.basic_auth
+@basic_auth
 def _api_sessions_delete(req: Request):
     serverly.user.delete_sessions(req.user.username)
     return Response()

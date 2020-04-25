@@ -38,6 +38,7 @@ import importlib
 import mimetypes
 import multiprocessing
 import re
+import time
 import urllib.parse as parse
 import warnings
 from functools import wraps
@@ -45,6 +46,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Union
 
 import serverly.stater
+import serverly.statistics
 from fileloghelper import Logger
 from serverly import default_sites
 from serverly.objects import Request, Response
@@ -76,10 +78,13 @@ class Handler(BaseHTTPRequestHandler):
             received_data = str(self.rfile.read(data_length), "utf-8")
             request = Request("GET", parsed_url, dict(
                 self.headers), received_data, self.client_address)
+            t1 = time.perf_counter()
             response = _sitemap.get_content(request)
+            t2 = time.perf_counter()
             self.respond(response)
             logger.context = name + ": GET"
             logger.debug(str(response))
+            serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -92,10 +97,13 @@ class Handler(BaseHTTPRequestHandler):
             received_data = str(self.rfile.read(data_length), "utf-8")
             request = Request("POST", parsed_url, dict(
                 self.headers), received_data, self.client_address)
+            t1 = time.perf_counter()
             response = _sitemap.get_content(request)
+            t2 = time.perf_counter()
             self.respond(response)
             logger.context = name + ": POST"
             logger.debug(str(response))
+            serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -107,10 +115,13 @@ class Handler(BaseHTTPRequestHandler):
             received_data = str(self.rfile.read(data_length), "utf-8")
             request = Request("PUT", parsed_url, dict(
                 self.headers), received_data, self.client_address)
+            t1 = time.perf_counter()
             response = _sitemap.get_content(request)
+            t2 = time.perf_counter()
             self.respond(response)
             logger.context = name + ": PUT"
             logger.debug(str(response))
+            serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -123,10 +134,13 @@ class Handler(BaseHTTPRequestHandler):
             received_data = str(self.rfile.read(data_length), "utf-8")
             request = Request("DELETE", parsed_url, dict(
                 self.headers), received_data, self.client_address)
+            t1 = time.perf_counter()
             response = _sitemap.get_content(request)
+            t2 = time.perf_counter()
             self.respond(response)
             logger.context = name + ": DELETE"
             logger.debug(str(response))
+            serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
@@ -206,6 +220,7 @@ class Server:
             if callable(self.cleanup_function):
                 self.cleanup_function()
             logger.success("Server stopped.")
+            serverly.statistics.print_stats()
 
 
 _server: Server = None
