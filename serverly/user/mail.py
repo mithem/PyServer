@@ -93,7 +93,7 @@ class MailManager:
 
     @online_url.setter
     def online_url(self, online_url: str):
-        url_pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~# =]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+        url_pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~# =]{1,256}(\.|:)[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
         if not re.match(url_pattern, str(online_url)) and not online_url == "":
             raise ValueError("Online_url appears to be invalid.")
         self._online_url = str(online_url)
@@ -276,9 +276,6 @@ class MailManager:
 
             subject = subject_temp.substitute(substitutions)
             content = content_temp.substitute(substitutions)
-
-            print("subject:", subject)
-            print("content:", content)
 
             try:
                 self.send(subject, content, username=username)
