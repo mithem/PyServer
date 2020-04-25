@@ -21,7 +21,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine fileloghelper stater sqlalchemy
+        pip install -r requirements.txt
+        pip install -r optional_requirements.txt
+        pip install numpy
     - name: Build and publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
