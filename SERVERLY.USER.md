@@ -233,3 +233,35 @@ serverly.user.mail.setup(
 | verify()                             | Verify user.                                                                                                                                                                                                                                                     |
 
 ## Sessions
+
+Sessions allow you to keep track of user activity. Use can use the [standard API](#standard-api) to serve useful endpoints.
+
+### Session configuration
+
+Attribute | Description
+-|-
+session_renew_threshold = 60 | number of seconds after which a new session will be created instead of increasing the end date
+
+### Session attributes
+
+Attribute | Description
+-|-
+id: int | id
+username: str | username session belongs to
+start: datetime.datetime | start date of the session
+end: datetime.datetime | end date of the session
+address: str | str representation of user's address (i.e. 'localhost:5678')
+length: datetime.timedelta (read-only) | length of the session
+
+### Methods for sessions
+
+All of these are located in `serverly.user.sessions`
+
+Method | Description
+-|-
+get_all_sessions(usernamw: str) | Return all sessions for `username`. `username`=None -> Return all sessions of all users.
+get_last_session(username: str) | Return last session object for `username`. None if no session exists.
+extend_session(id, new_end: datetime.datetime) | extend existint session up to new_end
+new_activity(username: str, address: tuple) | Update sessions to reflect a new user activity. If previous' sessions
+'s 'distance' is under `session_renew-treshold`, extend the last one, else create a new.
+delete_sessions(username: str) | Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable.
