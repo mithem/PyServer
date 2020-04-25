@@ -17,7 +17,7 @@ USER_NOT_FOUND_TMPLT = f"User $e"
 UNAUTHORIZED_TMPLT = f"Unauthorized."
 NOT_ACCEPTABLE_TMPLT = f"Invalid parameters. Expected at least username and password."
 
-# number of seconds after which a new session will be created instead of increasing the end value
+# number of seconds after which a new session will be created instead of increasing the end date
 session_renew_treshold = 60
 
 
