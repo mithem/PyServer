@@ -41,13 +41,14 @@ The standard user is already set up to have an `id`, `username`, `password` and 
 
 This method is used to specify initial configuration options. It accepts the following parameters:
 
-| Parameter                     | Description                                                                                                                                               |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| hash_algorithm: callable      | Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str. Defaults to hashlib's sha3_512. |
-| use_salting: bool             | Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure. Defaults to True.                                         |
-| filename: str                 |  Filename of the SQLite database                                                                                                                          |
-| user_columns: dict[str, type] |  Additional attributes of the user object. See example below. Defaults to an empty dict, meaning the user only has `id`, `username`, `password`, `salt`.  |
-| verbose: bool                 | Verbose mode of the SQLite engine                                                                                                                         |
+| Parameter                     | Description                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hash_algorithm: callable      | Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str. Defaults to hashlib's sha3_512.      |
+| use_salting: bool             | Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure. Defaults to True.                                              |
+| filename: str                 |  Filename of the SQLite database                                                                                                                               |
+| user_columns: dict[str, type] |  Additional attributes of the user object. See example below. Defaults to an empty dict, meaning the user only has `id`, `username`, `password`, `salt`.       |
+| verbose: bool                 | Verbose mode of the SQLite engine                                                                                                                              |
+| require_email_verification    |  Require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example. |
 
 Supported types for `user_columns`' values are str, float, int, bytes, bool.
 
@@ -238,30 +239,29 @@ Sessions allow you to keep track of user activity. Use can use the [standard API
 
 ### Session configuration
 
-Attribute | Description
--|-
-session_renew_threshold = 60 | number of seconds after which a new session will be created instead of increasing the end date
+| Attribute                    | Description                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| session_renew_threshold = 60 | number of seconds after which a new session will be created instead of increasing the end date |
 
 ### Session attributes
 
-Attribute | Description
--|-
-id: int | id
-username: str | username session belongs to
-start: datetime.datetime | start date of the session
-end: datetime.datetime | end date of the session
-address: str | str representation of user's address (i.e. 'localhost:5678')
-length: datetime.timedelta (read-only) | length of the session
+| Attribute                              | Description                                                  |
+| -------------------------------------- | ------------------------------------------------------------ |
+| id: int                                | id                                                           |
+| username: str                          | username session belongs to                                  |
+| start: datetime.datetime               | start date of the session                                    |
+| end: datetime.datetime                 | end date of the session                                      |
+| address: str                           | str representation of user's address (i.e. 'localhost:5678') |
+| length: datetime.timedelta (read-only) | length of the session                                        |
 
 ### Methods for sessions
 
-All of these are located in `serverly.user.sessions`
+All of these are located in `serverly.user`
 
-Method | Description
--|-
-get_all_sessions(usernamw: str) | Return all sessions for `username`. `username`=None -> Return all sessions of all users.
-get_last_session(username: str) | Return last session object for `username`. None if no session exists.
-extend_session(id, new_end: datetime.datetime) | extend existint session up to new_end
-new_activity(username: str, address: tuple) | Update sessions to reflect a new user activity. If previous' sessions
-'s 'distance' is under `session_renew-treshold`, extend the last one, else create a new.
-delete_sessions(username: str) | Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable.
+| Method                                         | Description                                                                                                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| get_all_sessions(usernamw: str)                | Return all sessions for `username`. `username`=None -> Return all sessions of all users.                                                                         |
+| get_last_session(username: str)                | Return last session object for `username`. None if no session exists.                                                                                            |
+| extend_session(id, new_end: datetime.datetime) | extend existint session up to new_end                                                                                                                            |
+| new_activity(username: str, address: tuple)    | Update sessions to reflect a new user activity. If previous' sessions' (?) 'distance' is under `session_renew-treshold`, extend the last one, else create a new. |
+| delete_sessions(username: str)                 | Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable.                                                                            |
