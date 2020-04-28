@@ -2,8 +2,19 @@ import pytest
 import serverly
 import json
 import urllib.parse as parse
+import multiprocessing
+import requests
 
 print("SERVERLY VERSION v" + serverly.version)
+address = "localhost", 8896
+domain = "http://" + address[0] + ":" + str(address[1])
+address_available = False
+
+try:
+    requests.get(domain)
+except requests.exceptions.ConnectionError as e:
+    if "Connection refused" in str(e):
+        address_available = True
 
 
 def test_get_server_address():
@@ -65,3 +76,47 @@ def test_response():
 def test_ranstr():
     for _ in range(100):
         assert len(serverly.utils.ranstr()) == 20
+
+
+@pytest.mark.skipif("not address_available")
+def test_server():
+    serverly.address = address
+
+    @serverly.serves("GET", "/")
+    @serverly.serves("GET", "/index")
+    def hello(req):
+        return serverly.objects.Response(body="Hello from pytest!")
+
+    @serverly.serves("POST", "/func2")
+    def func2():
+        return serverly.objects.Response()
+
+    @serverly.serves("PUT", "/erroorr")
+    def falsy(req):
+        raise NotImplementedError("yo what?")
+
+    def evaluate():
+        r = requests.get(domain)
+        r2 = requests.get(domain + "/index")
+        r3 = requests.post(domain + "/func2")
+        r4 = requests.put(domain + "/erroorr")
+
+        assert r.status_code == 200
+        assert r.text == "Hello from pytest!"
+
+        assert r2.status_code == r.status_code
+        assert r2.text == r.text
+
+        assert r3.status_code == 200
+        assert r3.text == ""
+
+        assert r4.status_code == 500
+        assert "Sorry, something went wrong on our side." in r4.text and "500 - Internal server error" in r4.text
+
+    p = multiprocessing.Process(target=serverly.start)
+
+    p.start()
+
+    evaluate()
+
+    p.terminate()

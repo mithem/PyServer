@@ -292,7 +292,7 @@ class Sitemap:
         found = False
         for key in self.methods[method].keys():
             if path == key:
-                found = True  # deleting right here raises RuntimeError
+                found = True
         if found:
             del self.methods[method][key]
             logger.context = "registration"
