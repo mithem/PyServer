@@ -1,2 +1,6 @@
 fileloghelper>=1.6.0
 numpy==1.15.0
+requests
+stater
+tabulate
+yagmail

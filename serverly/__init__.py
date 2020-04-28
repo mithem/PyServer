@@ -71,80 +71,46 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(bytes(response.body, "utf-8"))
 
-    def do_GET(self):
+    def handle_request(self, method: str):
         try:
             parsed_url = parse.urlparse(self.path)
             data_length = int(self.headers.get("Content-Length", 0))
             received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("GET", parsed_url, dict(
+            request = Request(method, parsed_url, dict(
                 self.headers), received_data, self.client_address)
             t1 = time.perf_counter()
             response = _sitemap.get_content(request)
             t2 = time.perf_counter()
             self.respond(response)
-            logger.context = name + ": GET"
+            logger.context = name + ": " + method
             logger.debug(str(response))
             serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             serverly.stater.error(logger)
             logger.handle_exception(e)
             raise e
+
+    def do_GET(self):
+        p = multiprocessing.Process(target=self.handle_request, args=(["GET"]))
+        p.start()
+        p.join()
 
     def do_POST(self):
-        try:
-            parsed_url = parse.urlparse(self.path)
-            data_length = int(self.headers.get("Content-Length", 0))
-            received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("POST", parsed_url, dict(
-                self.headers), received_data, self.client_address)
-            t1 = time.perf_counter()
-            response = _sitemap.get_content(request)
-            t2 = time.perf_counter()
-            self.respond(response)
-            logger.context = name + ": POST"
-            logger.debug(str(response))
-            serverly.statistics.calculation_times.append(t2 - t1)
-        except Exception as e:
-            serverly.stater.error(logger)
-            logger.handle_exception(e)
+        p = multiprocessing.Process(
+            target=self.handle_request, args=(["POST"]))
+        p.start()
+        p.join()
 
     def do_PUT(self):
-        try:
-            parsed_url = parse.urlparse(self.path)
-            data_length = int(self.headers.get("Content-Length", 0))
-            received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("PUT", parsed_url, dict(
-                self.headers), received_data, self.client_address)
-            t1 = time.perf_counter()
-            response = _sitemap.get_content(request)
-            t2 = time.perf_counter()
-            self.respond(response)
-            logger.context = name + ": PUT"
-            logger.debug(str(response))
-            serverly.statistics.calculation_times.append(t2 - t1)
-        except Exception as e:
-            serverly.stater.error(logger)
-            logger.handle_exception(e)
-            raise e
+        p = multiprocessing.Process(target=self.handle_request, args=(["PUT"]))
+        p.start()
+        p.join()
 
     def do_DELETE(self):
-        try:
-            parsed_url = parse.urlparse(self.path)
-            data_length = int(self.headers.get("Content-Length", 0))
-            received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request("DELETE", parsed_url, dict(
-                self.headers), received_data, self.client_address)
-            t1 = time.perf_counter()
-            response = _sitemap.get_content(request)
-            t2 = time.perf_counter()
-            self.respond(response)
-            logger.context = name + ": DELETE"
-            logger.debug(str(response))
-            serverly.statistics.calculation_times.append(t2 - t1)
-        except Exception as e:
-            serverly.stater.error(logger)
-            logger.handle_exception(e)
-            raise e
+        p = multiprocessing.Process(
+            target=self.handle_request, args=(["DELETE"]))
+        p.start()
+        p.join()
 
 
 class Server:
