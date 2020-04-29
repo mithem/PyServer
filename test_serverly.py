@@ -15,6 +15,8 @@ try:
 except requests.exceptions.ConnectionError as e:
     if "Connection refused" in str(e):
         address_available = True
+except:
+    pass
 
 
 def test_get_server_address():
