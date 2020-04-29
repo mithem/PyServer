@@ -80,6 +80,7 @@ def test_ranstr():
         assert len(serverly.utils.ranstr()) == 20
 
 
+@pytest.mark.skip
 @pytest.mark.skipif("not address_available")
 def test_server():
     serverly.address = address
