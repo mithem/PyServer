@@ -128,3 +128,8 @@ class Response(CommunicationObject):
 
     def __str__(self):
         return f"Responding to request with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"
+
+
+class Redirect(Response):
+    def __init__(self, path: str, code=303):
+        super().__init__(code, {"Location": path})
