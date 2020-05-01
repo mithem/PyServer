@@ -91,26 +91,16 @@ class Handler(BaseHTTPRequestHandler):
             raise e
 
     def do_GET(self):
-        p = multiprocessing.Process(target=self.handle_request, args=(["GET"]))
-        p.start()
-        p.join()
+        self.handle_request("GET")
 
     def do_POST(self):
-        p = multiprocessing.Process(
-            target=self.handle_request, args=(["POST"]))
-        p.start()
-        p.join()
+        self.handle_request("POST")
 
     def do_PUT(self):
-        p = multiprocessing.Process(target=self.handle_request, args=(["PUT"]))
-        p.start()
-        p.join()
+        self.handle_request("PUT")
 
     def do_DELETE(self):
-        p = multiprocessing.Process(
-            target=self.handle_request, args=(["DELETE"]))
-        p.start()
-        p.join()
+        self.handle_request("DELETE")
 
 
 class Server:

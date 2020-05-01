@@ -105,7 +105,7 @@ class Request(CommunicationObject):
         self.user = None
 
     def __str__(self):
-        s = f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers."
+        s = f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers."
         if self.auth_type != None:
             s += f" With '{self.auth_type}' authentication."
         return s
