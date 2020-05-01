@@ -5,7 +5,7 @@ from functools import wraps
 
 import sqlalchemy
 import serverly
-from serverly.objects import DBObject, Response
+from serverly.objects import DBObject, Response, Request
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError)
 from serverly.utils import ranstr
@@ -212,6 +212,17 @@ def get_by_email(email: str, strict=True):
 
 
 @_setup_required
+def get_by_token(bearer_token: str, strict=True):
+    session = _Session()
+    result: User = session.query(User).filter_by(
+        bearer_token=bearer_token).first()
+    session.close()
+    if result == None and strict:
+        raise UserNotFoundError("No user with token found.")
+    return result
+
+
+@_setup_required
 def get_all():
     """Return a list of all user objects in the database."""
     session = _Session()
@@ -323,13 +334,16 @@ def basic_auth(func):
 
     Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
     @wraps(func)
-    def wrapper(request, *args, **kwargs):
+    def wrapper(request: Request, *args, **kwargs):
         global require_verified
         try:
             if request.auth_type.lower() == "basic":
                 request.user = get(request.user_cred[0])
                 authenticate(
                     request.user_cred[0], request.user_cred[1], True, require_verified)
+            else:
+                # Don't wanna have too many exc
+                raise NotAuthorizedError("Not authenticated.")
         except (AttributeError, NotAuthorizedError) as e:
             s = {"e": str(e)}
             if e.__class__ == AttributeError:
@@ -346,6 +360,41 @@ def basic_auth(func):
                 e=str(e))
             return Response(404, body=msg)
         except Exception as e:
+            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+        return func(request, *args, **kwargs)
+    return wrapper
+
+
+def bearer_auth(func):
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED.
+
+    Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
+    @wraps(func)
+    def wrapper(request: Request, *args, **kwargs):
+        global require_verified
+        try:
+            if request.auth_type.lower() == "bearer":
+                token = request.user_cred
+                if token == None or token == "":
+                    raise NotAuthorizedError("Not authenticated.")
+                request.user = get_by_token(token)
+            else:
+                # Don't wanna have too many exc
+                raise NotAuthorizedError("Not authenticated properly.")
+        except (AttributeError, NotAuthorizedError) as e:
+            s = {"e": str(e)}
+            if e.__class__ == AttributeError:
+                header = {"WWW-Authenticate": "Bearer"}
+            else:
+                header = {}
+                s = {**get(request.user_cred[0]).to_dict(), **s}
+            temp = string.Template(UNAUTHORIZED_TMPLT)
+            msg = temp.substitute(s)
+            return Response(401, header, msg)
+        except UserNotFoundError as e:
+            return Response(404, body="Invalid bearer token")
+        except Exception as e:
+            serverly.logger.handle_exception(e)
             return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
         return func(request, *args, **kwargs)
     return wrapper

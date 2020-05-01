@@ -6,7 +6,7 @@ import serverly
 import serverly.utils
 from serverly import Request, Response, error_response
 from serverly.user import err
-from serverly.user import basic_auth
+from serverly.user import basic_auth, bearer_auth
 import serverly.user
 from functools import wraps
 
@@ -19,21 +19,25 @@ use_sessions = False
 
 def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_user_calls_endpoint=False):
     """Serverly comes with builtin API-functions for the following serverly.user functions:
-    - authenticate
-    - change
-    - delete
-    - get
-    - register
-    - sessions.post (create new session or append to existing one)
-    - sessions.get (get all sessions of user)
-    - sessions.delete (delete all sessions of user)
+    - authenticate: Basic
+    - change: Basic
+    - delete: Basic
+    - get: Basic
+    - register: None
+    - sessions.post: Basic (create new session or append to existing one)
+    - sessions.get: Basic (get all sessions of user)
+    - sessions.delete: Basic (delete all sessions of user)
+    - bearer.authenticate: Bearer (authenticate user with Bearer token)
+    - bearer.new: Basic (Send a new Bearer token to user authenticated via Basic)
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
 
-    Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`. If `require_user_to_be_verified`, users will only authenticate if their email is verified.
+    Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
+
+    If `require_user_to_be_verified`, users will only authenticate if their email is verified.
     """
     global verify_mail
     supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
-                       "delete": _api_delete, "get": _api_get, "register": _api_register, "sessions.post": _api_sessions_post, "sessions.get": _api_sessions_get, "sessions.delete": _api_sessions_delete}
+                       "delete": _api_delete, "get": _api_get, "register": _api_register, "sessions.post": _api_sessions_post, "sessions.get": _api_sessions_get, "sessions.delete": _api_sessions_delete, "bearer.authenticate": _api_bearer_authenticate, "bearer.new": _api_bearer_new}
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
             "function not supported. Supported are " + ", ".join(supported_funcs.keys()) + ".")
@@ -123,3 +127,15 @@ def _api_sessions_get(req: Request):
 def _api_sessions_delete(req: Request):
     serverly.user.delete_sessions(req.user.username)
     return Response()
+
+
+@bearer_auth
+def _api_bearer_authenticate(request: Request):
+    return Response()
+
+
+@basic_auth
+def _api_bearer_new(request: Request):
+    token = serverly.utils.ranstr(50)
+    serverly.user.change(request.user.username, bearer_token=token)
+    return Response(body={"token": token})
