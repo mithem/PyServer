@@ -3,6 +3,7 @@ import os
 import random
 import string
 import copy
+import serverly
 
 
 def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
@@ -86,12 +87,16 @@ def guess_response_info(content: str):
 
 
 def clean_user_object(user_s):
-    """return cleaned version of object passed in. user_s can be of type User or list[User]."""
+    """return cleaned version (dict!!!) of object passed in. user_s can be of type User or list[User]."""
+    bad_attributes = ["id", "password", "salt",
+                      "bearer_token", "metadata", "to_dict"]
+
     def clean(u):
-        new = copy.deepcopy(u)
-        del new.salt
-        del new.password
+        new = {}
+        for attr in dir(u):
+            if not callable(attr) and not attr.startswith("_") and not attr in bad_attributes:
+                new[attr] = getattr(u, attr)
         return new
     if type(user_s) == list:
-        return [clean(u).to_dict() for u in user_s]
+        return [clean(u) for u in user_s]
     return clean(user_s)
