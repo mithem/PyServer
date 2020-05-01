@@ -98,10 +98,9 @@ def test_clean_user_object():
     u.password = "dnsakjrßheönocuq3öoiewjOurcqwrPOevuiä3u"
     u.salt = "wdaiurjelkcbcjvkerkjwvegröui"
     u.username = "helloworld"
+    u.bearer_token = serverly.utils.ranstr(50)
+    u.birth_year = 1970
+    u.first_name = "Timmy"
     n = serverly.utils.clean_user_object(u)
-    assert getattr(n, "password", None) == None
-    assert getattr(n, "salt", None) == None
-    c = n.id
-    d = n.username
-    assert c == 0
-    assert d == "helloworld"
+    assert n == {"username": "helloworld",
+                 "birth_year": 1970, "first_name": "Timmy"}
