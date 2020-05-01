@@ -20,7 +20,7 @@ $verification_url
 
 
 class MailManager:
-    def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = "", pending_interval=15, scheduled_interval=15):
+    def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = "", pending_interval=15, scheduled_interval=15, debug=False):
         self._email_address = None
         self._email_password = None
         self._verification_subject = None
@@ -38,6 +38,8 @@ class MailManager:
 
         self.pending_interval = int(pending_interval)
         self.scheduled_interval = int(scheduled_interval)
+
+        self.debug = debug
 
     def _renew_yagmail_smtp(self):
         self.yag = yagmail.SMTP(self.email_address, self.email_password)
@@ -117,6 +119,8 @@ class MailManager:
                 content = content_temp.safe_substitute(**d)
 
             self.yag.send(email, subject, content, attachments)
+            if self.debug:
+                serverly.logger.success(f"Sent mail to {email}!")
         except KeyboardInterrupt:
             pass
         except Exception as e:
@@ -228,7 +232,7 @@ class MailManager:
                     n = self.send_pending()
                     serverly.logger.context = "MailManager"
                     serverly.logger.success(
-                        f"Sent {str(n)} pending emails", False)
+                        f"Sent {str(n)} pending emails", self.debug)
                     time.sleep(self.pending_interval)
             except KeyboardInterrupt:
                 self._save()
@@ -241,7 +245,7 @@ class MailManager:
                     n = self.send_scheduled()
                     serverly.logger.context = "MailManager"
                     serverly.logger.success(
-                        f"Sent {str(n)} scheduled emails", False)
+                        f"Sent {str(n)} scheduled emails", self.debug)
                     time.sleep(self.scheduled_interval)
             except KeyboardInterrupt:
                 self._save()
@@ -261,7 +265,7 @@ class MailManager:
         serverly.logger.context = "startup"
         serverly.logger.success("MailManager started!")
 
-    def send_verification_mail(self, username: str):
+    def schedule_verification_mail(self, username: str):
         try:
             identifier = ranstr()
             verification_url = self.online_url + \
@@ -278,7 +282,8 @@ class MailManager:
             content = content_temp.substitute(substitutions)
 
             try:
-                self.send(subject, content, username=username)
+                self.schedule(
+                    {"username": username, "subject": subject, "content": content}, True)
                 try:
                     with open("pending_verifications.json", "r") as f:
                         try:
@@ -319,7 +324,7 @@ def verify(identifier: str):
 manager: MailManager = None
 
 
-def setup(email_address: str, email_password: str, verification_subject_template: str = None, verification_content_template: str = None, online_url="", pending_interval=15, scheduled_interval=15):
+def setup(email_address: str, email_password: str, verification_subject_template: str = None, verification_content_template: str = None, online_url="", pending_interval=15, scheduled_interval=15, debug=False):
     global manager
     manager = MailManager(email_address, email_password, verification_subject_template,
-                          verification_content_template, online_url, pending_interval, scheduled_interval)
+                          verification_content_template, online_url, pending_interval, scheduled_interval, debug)
