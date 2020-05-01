@@ -17,7 +17,7 @@ only_user_verified = False
 use_sessions = False
 
 
-def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_user_calls_endpoint=False):
+def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False):
     """Serverly comes with builtin API-functions for the following serverly.user functions:
     - authenticate: Basic
     - change: Basic
@@ -34,6 +34,8 @@ def use(function: str, method: str, path: str, mail_verification=False, require_
     Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
 
     If `require_user_to_be_verified`, users will only authenticate if their email is verified.
+
+    If `use_sessions_when_client_calls_endpoint`, a new user activity will automatically be registered if the client uses an endpoint.
     """
     global verify_mail
     supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
@@ -50,7 +52,7 @@ def use(function: str, method: str, path: str, mail_verification=False, require_
         verify_mail = True
     if require_user_to_be_verified:
         only_user_verified = True
-    if use_sessions_when_user_calls_endpoint:
+    if use_sessions_when_client_calls_endpoint:
         use_sessions = True
 
 
@@ -95,7 +97,7 @@ def _api_register(req: Request):  # cannot use _check_to_use_sessions as it need
         response = Response()
         serverly.user.new_activity(req.obj["username"], req.address)
         if verify_mail:
-            serverly.user.mail.manager.send_verification_mail(
+            serverly.user.mail.manager.schedule_verification_mail(
                 req.obj["username"])
     except (KeyError, AttributeError, TypeError) as e:
         serverly.logger.handle_exception(e)
@@ -115,6 +117,7 @@ def _api_sessions_post(req: Request):
 
 
 @basic_auth
+@_check_to_use_sessions
 def _api_sessions_get(req: Request):
     ses = serverly.user.get_all_sessions(req.user.username)
     sessions = [s.to_dict()
@@ -130,11 +133,13 @@ def _api_sessions_delete(req: Request):
 
 
 @bearer_auth
+@_check_to_use_sessions
 def _api_bearer_authenticate(request: Request):
     return Response()
 
 
 @basic_auth
+@_check_to_use_sessions
 def _api_bearer_new(request: Request):
     token = serverly.utils.ranstr(50)
     serverly.user.change(request.user.username, bearer_token=token)

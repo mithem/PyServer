@@ -281,7 +281,7 @@ def get_all_sessions(username: str):
 def get_last_session(username: str):
     session = _Session()
     result: Session = session.query(
-        Session).filter_by(username=username).first()
+        Session).filter_by(username=username).order_by(sqlalchemy.desc(Session.id)).first()
     session.close()
     return result
 
@@ -310,7 +310,7 @@ def new_activity(username: str, address: tuple):
     n = datetime.datetime.now()
     last = get_last_session(username)
     try:
-        if last.end + datetime.timedelta(seconds=session_renew_treshold) < n:
+        if last.end + datetime.timedelta(seconds=session_renew_treshold) > n:
             extend_session(last.id, n)
         else:
             create_new()
@@ -373,7 +373,6 @@ def bearer_auth(func):
     Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
     @wraps(func)
     def wrapper(request: Request, *args, **kwargs):
-        global require_verified
         try:
             if request.auth_type.lower() == "bearer":
                 token = request.user_cred
@@ -398,5 +397,26 @@ def bearer_auth(func):
         except Exception as e:
             serverly.logger.handle_exception(e)
             return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+        return func(request, *args, **kwargs)
+    return wrapper
+
+
+def session_auth(func):
+    """Use this decorator to authenticate the user by the latest session. Requires the use of `bearer_token`s (you don't need to use the decorator but user objects need to have the `bearer_token`-attribute)."""
+    @wraps(func)
+    @bearer_auth
+    def wrapper(request: Request, *args, **kwargs):
+        print(request)
+        unauth_res = string.Template(
+            UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict())
+        try:
+            last_session = get_last_session(request.user.username)
+            if last_session.end + datetime.timedelta(seconds=session_renew_treshold) < datetime.datetime.now():
+                return Response(401, body=unauth_res)
+        except AttributeError:
+            return Response(401, {"WWW-Authenticate": "Bearer"}, unauth_res)
+        except Exception as e:
+            serverly.logger.handle_exception(e)
+            return Response(500, body=str(e))
         return func(request, *args, **kwargs)
     return wrapper
