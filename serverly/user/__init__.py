@@ -2,14 +2,16 @@ import datetime
 import hashlib
 import string
 from functools import wraps
+from hmac import compare_digest
 
-import sqlalchemy
 import serverly
-from serverly.objects import DBObject, Response, Request
+import sqlalchemy
+from serverly.objects import DBObject, Request, Response
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError)
 from serverly.utils import ranstr
-from sqlalchemy import Binary, Boolean, Column, Float, Integer, String, DateTime, Interval
+from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
+                        Interval, String)
 from sqlalchemy.ext.declarative import declarative_base
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
@@ -177,8 +179,8 @@ def authenticate(username: str, password: str, strict=False, verified=False):
     """Return True or False. If `strict`, raise `NotAuthorizedError`. If `verified`, the user also has to be verified (requires email)"""
     session = _Session()
     req_user = session.query(User).filter_by(username=username).first()
-    result = req_user.password == algorithm(
-        bytes(req_user.salt * salting + password, "utf-8")).hexdigest()
+    result = compare_digest(req_user.password, algorithm(
+        bytes(req_user.salt * salting + password, "utf-8")).hexdigest())
     if verified:
         result = result and req_user.verified
     if strict:
