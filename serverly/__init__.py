@@ -310,6 +310,7 @@ class Sitemap:
             try:
                 content = site(request)
             except TypeError as e:  # makes debugging easier
+                serverly.logger.handle_exception(e)
                 try:
                     content = site()
                 except TypeError as e:

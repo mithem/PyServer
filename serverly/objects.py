@@ -93,7 +93,7 @@ class Request(CommunicationObject):
                 else:
                     self.user_cred = None
                     warnings.warn(
-                        "Requested auth method not supported. Expected Basic or Bearer")
+                        "Requested auth method not supported. Expected Basic or Bearer.")
                 self.authenticated = True
         if not self.authenticated:
             self._set_auth_none()
@@ -102,6 +102,7 @@ class Request(CommunicationObject):
     def _set_auth_none(self):
         self.auth_type = None
         self.user_cred = None
+        self.user = None
 
     def __str__(self):
         s = f"{self.method.upper()}-Request from '{self.address[0]}:{str(self.address[1])}' for '{self.path}' with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers."

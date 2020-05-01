@@ -2,7 +2,7 @@ from serverly.objects import Request, Response
 
 
 def page_not_found_error(req: Request):
-    return Response(404, body=f"<html><h3>404 - Page not found.</h3><br />Sorry, we couldn't find '{req.path}'.</html>")
+    return Response(404, body=f"<html><h3>404 - Page not found.</h3><br />Sorry, we couldn't find '{req.path.path}'.</html>")
 
 
 def general_server_error(req):
