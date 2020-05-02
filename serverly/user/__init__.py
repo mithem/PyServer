@@ -16,9 +16,8 @@ from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
 from sqlalchemy.ext.declarative import declarative_base
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
-USER_NOT_FOUND_TMPLT = f"User $e"
-UNAUTHORIZED_TMPLT = f"Unauthorized."
-NOT_ACCEPTABLE_TMPLT = f"Invalid parameters. Expected at least username and password."
+USER_NOT_FOUND_TMPLT = "User $e"
+UNAUTHORIZED_TMPLT = "Unauthorized."
 
 # number of seconds after which a new session will be created instead of increasing the end date
 session_renew_treshold = 60
