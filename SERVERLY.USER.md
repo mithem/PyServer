@@ -19,6 +19,11 @@ This subpackage allows very easy user-management right through serverly.
   - [Configuration](#mailmanager-configuration)
   - [Methods](#mailmanager-methods)
 - [Sessions](#sessions)
+- [Auth](#auth)
+  - [basic_auth()](#basic_auth)
+  - [bearer_auth()](#bearer_auth)
+  - [session_auth()](#session_auth)
+- [Role-based Authorization](#role-based-authorization)
 
 ## Configuration
 
@@ -99,6 +104,30 @@ Raises:
 
 - `UserNotFoundError` if `strict`
 
+### get_by_email()
+
+Get user specified by `email`. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None.
+
+Example:
+
+```python
+>>> user = serverly.user.get_by_email('yo@not10minutemail.com')
+>>> print(user)
+<User(id=1, username=new_user, password=atotallysecurepassword1234, salt=..., email=yo@not10minutemail.com, birth_year=None, gdp=None, newsletter=None)>
+```
+
+Raises:
+
+- `UserNotFoundError` if `strict`
+
+### get_by_token()
+
+Get user specified by `bearer_token`. If `strict` (default), raise UserNotFoundError if no one is found. Else return None.
+
+Raises:
+
+- `UserNotFoundError` if `strict`
+
 ### authenticate()
 
 Return True or False. Required parameters are `username` and `password`. If `strict`, raise `NotAuthorizedError`.
@@ -170,6 +199,10 @@ Raises:
 
 - `UserNotFoundError`.
 
+### delete_all()
+
+Delete all users in the database permanently.
+
 ## Standard API
 
 Serverly comes with a builtin standard API for user management. You just have to tell it where your endpoint should go.
@@ -206,7 +239,8 @@ serverly.user.mail.setup(
     verification_content_template: str=None,
     online_url="",
     pending_interval=15,
-    scheduled_interval=15
+    scheduled_interval=15,
+    debug=False
 )
 ```
 
@@ -221,6 +255,7 @@ serverly.user.mail.setup(
 | online_url: str            | URL where the server can be reached (`superpath` **not** included). Will be used to replace `$verification_url` when using `schedule_verification_mail()` and/or the [register() standard api](#standard-api) |
 | pending_interval: int      |  Interval (seconds) pending (non-scheduled) emails will be tried to send                                                                                                                                      |
 | scheduled_interval: int    |  Interval (seconds) scheduled mails will be sent if they should (see [schedule()](#schedule))                                                                                                                 |
+| debug: bool                | debug/verbose mode                                                                                                                                                                                            |
 
 ### MailManager Methods
 
@@ -260,8 +295,80 @@ All of these are located in `serverly.user`
 
 | Method                                         | Description                                                                                                                                                      |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| get_all_sessions(usernamw: str)                | Return all sessions for `username`. `username`=None -> Return all sessions of all users.                                                                         |
+| get_all_sessions(username: str)                | Return all sessions for `username`. `username`=None -> Return all sessions of all users.                                                                         |
 | get_last_session(username: str)                | Return last session object for `username`. None if no session exists.                                                                                            |
 | extend_session(id, new_end: datetime.datetime) | extend existint session up to new_end                                                                                                                            |
 | new_activity(username: str, address: tuple)    | Update sessions to reflect a new user activity. If previous' sessions' (?) 'distance' is under `session_renew-treshold`, extend the last one, else create a new. |
 | delete_sessions(username: str)                 | Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable.                                                                            |
+
+## Auth
+
+Serverly comes with built-in decorators for HTTP Basic & Bearer authentication. When authentication successful, the user will automatically be fetched from the database and be assigned to request.user. If the authentication fails, serverly will respond with the appropriate code and message. Also see [customization](#customization).
+
+### basic_auth()
+
+Authenticate with a username and password. **Insecure on non-HTTPS-Connections** (which serverly **does not** provide)!
+
+Example:
+
+```python
+@serves('GET', '/secret')
+@user.basic_auth
+def my_page(req):
+    return Response(body=f"You're logged in as {req.user.username}!")
+```
+
+Note: authorization decorators need to be placed 'under' / 'after' the serves-decorator.
+
+### bearer_auth()
+
+Authenticate via Bearer token. To map tokens to users and vice-versa, each user needs to have an attribute `bearer-token`. You can change it by just calling user.change(bearer_token=...) or using the standard API (bearer.new)
+
+Example:
+
+```python
+@serves('GET', '/bearer')
+@user.bearer_auth
+def my_page(req):
+    return Response(body=f'You authenticated as {req.user.username} with bearer token {req.user.bearer_token}!')
+```
+
+### session_auth()
+
+Special authorization using Bearer tokens (see [bearer_auth()](#bearer_auth); therefore same requirements and token generation). Uses sessions and `session_renew_treshold` to decide whether to log in a user (assuming their bearer token is valid). If the last session of the user, which means that they where authenticated then is less than `session_renew_treshold` in the past, they are authorized.
+
+Example:
+
+```python
+@serves('GET', '/newproduct')
+@user.session_auth
+def my_page(req):
+    return Response(body=f'You authenticated as {req.user.username} with bearer token {req.user.bearer_token}!')
+```
+
+### Customization
+
+Serverly offers 3 templates (the string library's template engine) for how to respond to which falsy request.
+
+| Status code        | Varname              | Default       | Available variables                                                | Example                 |
+| ------------------ | -------------------- | ------------- | ------------------------------------------------------------------ | ----------------------- |
+| 404 - Not found    | USER_NOT_FOUND_TMPLT |  User \$e     | user attributes, e: str(Exception)                                 | User 'hello' not found. |
+| 401 - Unauthorized | UNAUTHORIZED_TMPLT   | Unauthorized. | user attributes, e: str(Exception) when using basic authentication |
+
+## Role-based Authorization
+
+Serverly also comes with a built-in role-based authorization. This means that you can assign custom roles as strings to users and authenticate them in certain endpoints based on the fact whether they are assigned a certain role.
+
+You can define which roles should be allowed for any endpoint by using the `serverly.user.requires_role(role: Union[str, list])`-decorator where role is a str or list of strings which should be allowed in the endpoint.
+
+The user object needs to have a `role` attribute.
+
+Example:
+
+```python
+@serves('GET', '/status')
+@user.basic_auth
+@user.requires_role('admin')
+def admin_status_page(req):
+    return Response(body=f"Everything fine!")
+```
