@@ -55,7 +55,7 @@ from serverly.utils import *
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
-version = "0.3.2"
+version = "0.4.0"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -354,34 +354,6 @@ class Sitemap:
 
 
 _sitemap = Sitemap()
-
-
-def serves_get(path: str):
-    """Decorator for registering a function for `path`, with method GET"""
-    logger.handle_exception(DeprecationWarning(
-        "serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('GET') instead."))
-
-    def wrapper_function(func):
-        _sitemap.register_site("GET", func, path)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        return wrapper
-    return wrapper_function
-
-
-def serves_post(path: str):
-    """Decorator for registering a function for `path`, with method POST"""
-    logger.handle_exception(DeprecationWarning(
-        "serverly.serves_get() and serves_post() are deprecated since serverly v0.3.0. Please use serverly.serves('POST') instead."))
-
-    def wrapper_function(func):
-        _sitemap.register_site("POST", func, path)
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        return wrapper
-    return wrapper_function
 
 
 def serves(method: str, path: str):
