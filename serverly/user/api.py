@@ -15,6 +15,7 @@ _RES_406 = Response(
 verify_mail = False
 only_user_verified = False
 use_sessions = False
+persistant_user_attributes = []
 
 
 def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False):
@@ -30,12 +31,6 @@ def use(function: str, method: str, path: str, mail_verification=False, require_
     - bearer.authenticate: Bearer (authenticate user with Bearer token)
     - bearer.new: Basic (Send a new Bearer token to user authenticated via Basic)
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
-
-    Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
-
-    If `require_user_to_be_verified`, users will only authenticate if their email is verified.
-
-    If `use_sessions_when_client_calls_endpoint`, a new user activity will automatically be registered if the client uses an endpoint.
     """
     global verify_mail
     supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
@@ -46,14 +41,21 @@ def use(function: str, method: str, path: str, mail_verification=False, require_
     serverly._sitemap.register_site(
         method, supported_funcs[function.lower()], path)
 
-    global verify_mail, only_user_verified, use_sessions
 
-    if mail_verification:
-        verify_mail = True
-    if require_user_to_be_verified:
-        only_user_verified = True
-    if use_sessions_when_client_calls_endpoint:
-        use_sessions = True
+def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, *fixed_user_attributes):
+    """Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
+
+    If `require_user_to_be_verified`, users will only authenticate if their email is verified.
+
+    If `use_sessions_when_client_calls_endpoint`, a new user activity will automatically be registered if the client uses an endpoint.
+
+    `fixed_user_attributes` is a list which contains the attribute names of User attributes which may not be changed by the API. Useful for roles.
+    """
+    global verify_mail, only_user_verified, use_sessions, persistant_user_attributes
+    verify_mail = mail_verification
+    only_user_verified = require_user_to_be_verified
+    use_sessions = use_sessions_when_client_calls_endpoint
+    persistant_user_attributes = fixed_user_attributes
 
 
 def _check_to_use_sessions(func):
@@ -74,7 +76,11 @@ def _api_authenticate(req: Request):
 @basic_auth
 @_check_to_use_sessions
 def _api_change(req: Request):
-    serverly.user.change(req.user_cred[0], **req.obj)
+    new = {}
+    for k, v in req.obj.items():
+        if k not in persistant_user_attributes:
+            new[k] = v
+    serverly.user.change(req.user_cred[0], **new)
     return Response()
 
 

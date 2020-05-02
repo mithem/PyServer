@@ -3,6 +3,7 @@ import hashlib
 import string
 from functools import wraps
 from hmac import compare_digest
+from typing import Union
 
 import serverly
 import sqlalchemy
@@ -368,9 +369,7 @@ def basic_auth(func):
 
 
 def bearer_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED.
-
-    Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
     @wraps(func)
     def wrapper(request: Request, *args, **kwargs):
         try:
@@ -406,7 +405,6 @@ def session_auth(func):
     @wraps(func)
     @bearer_auth
     def wrapper(request: Request, *args, **kwargs):
-        print(request)
         unauth_res = string.Template(
             UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict())
         try:
@@ -420,3 +418,21 @@ def session_auth(func):
             return Response(500, body=str(e))
         return func(request, *args, **kwargs)
     return wrapper
+
+
+def requires_role(role: Union[str, list]):
+    """Use this decorator to authenticate the user by their `role`-attribute. Requires the use of another authentication decorator before this one."""
+    role = [r.lower() for r in role] if type(role) == list else role.lower()
+
+    def my_wrap(func):
+        @wraps(func)
+        def wrapper(request: Request, *args, **kwargs):
+            if type(role) == list:
+                if request.user.role.lower() in role:
+                    return func(request, *args, **kwargs)
+            if type(role) == str:
+                if request.user.role.lower() == role:
+                    return func(request, *args, **kwargs)
+            return Response(401, body=string.Template(UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict()))
+        return wrapper
+    return my_wrap
