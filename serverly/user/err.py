@@ -12,3 +12,7 @@ class UserAlreadyExistsError(Exception):
 
 class MissingParameterError(Exception):
     pass
+
+
+class ConfigurationError(Exception):
+    pass

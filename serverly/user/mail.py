@@ -9,6 +9,7 @@ from functools import wraps
 import serverly
 import yagmail
 from serverly.utils import ranstr
+from serverly.user import _requires_user_attr
 
 _default_verification_subject = "Your recent registration"
 _default_verification_template = """Hey $username,
@@ -20,6 +21,7 @@ $verification_url
 
 
 class MailManager:
+    @_requires_user_attr("email")
     def __init__(self, email_address: str, email_password: str, verification_subject=None, verification_template: str = None, online_url: str = "", pending_interval=15, scheduled_interval=15, debug=False):
         self._email_address = None
         self._email_password = None
@@ -265,6 +267,7 @@ class MailManager:
         serverly.logger.context = "startup"
         serverly.logger.success("MailManager started!")
 
+    @_requires_user_attr("verified")
     def schedule_verification_mail(self, username: str):
         try:
             identifier = ranstr()
@@ -304,6 +307,7 @@ class MailManager:
             raise e
 
 
+@_requires_user_attr("verified")
 def verify(identifier: str):
     try:
         with open("pending_verifications.json", "r") as f:

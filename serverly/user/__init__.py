@@ -9,7 +9,7 @@ import serverly
 import sqlalchemy
 from serverly.objects import DBObject, Request, Response
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
-                               UserNotFoundError)
+                               UserNotFoundError, ConfigurationError)
 from serverly.utils import ranstr
 from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
                         Interval, String)
@@ -22,6 +22,7 @@ NOT_ACCEPTABLE_TMPLT = f"Invalid parameters. Expected at least username and pass
 
 # number of seconds after which a new session will be created instead of increasing the end date
 session_renew_treshold = 60
+_required_user_attrs = []
 
 
 Base = declarative_base()
@@ -141,6 +142,10 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     _Session = sqlalchemy.orm.sessionmaker(bind=_engine)
     require_verified = require_email_verification
 
+    for attr in _required_user_attrs:
+        if getattr(User, attr, "definetely not a value") == "definetely not a value":
+            raise ConfigurationError(f"User does not have attribute '{attr}'")
+
 
 def _setup_required(func):
     """internal decorator to apply when db setup is required before running the function"""
@@ -150,6 +155,19 @@ def _setup_required(func):
             setup()
         return func(*args, **kwargs)
     return wrapper
+
+
+def _requires_user_attr(attribute: str):
+    """Internal decorator to raise Exception if user does not have a required attribute."""
+    def my_wrap(func):
+        global _required_user_attrs
+        _required_user_attrs.append(str(attribute))
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    return my_wrap
 
 
 @_setup_required
@@ -333,9 +351,7 @@ def delete_sessions(username: str):
 
 
 def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED.
-
-    Note: On the decorator stack, this has to be the lowest (nearest to your function), otherwise things will get caotic!"""
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
     @wraps(func)
     def wrapper(request: Request, *args, **kwargs):
         global require_verified
@@ -368,36 +384,39 @@ def basic_auth(func):
     return wrapper
 
 
+@_requires_user_attr("bearer_token")
 def bearer_auth(func):
     """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
-    @wraps(func)
-    def wrapper(request: Request, *args, **kwargs):
-        try:
-            if request.auth_type.lower() == "bearer":
-                token = request.user_cred
-                if token == None or token == "":
-                    raise NotAuthorizedError("Not authenticated.")
-                request.user = get_by_token(token)
-            else:
-                # Don't wanna have too many exc
-                raise NotAuthorizedError("Not authenticated properly.")
-        except (AttributeError, NotAuthorizedError) as e:
-            s = {"e": str(e)}
-            if e.__class__ == AttributeError:
-                header = {"WWW-Authenticate": "Bearer"}
-            else:
-                header = {}
-                s = {**get(request.user_cred[0]).to_dict(), **s}
-            temp = string.Template(UNAUTHORIZED_TMPLT)
-            msg = temp.substitute(s)
-            return Response(401, header, msg)
-        except UserNotFoundError as e:
-            return Response(404, body="Invalid bearer token")
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
-        return func(request, *args, **kwargs)
-    return wrapper
+    def onion():
+        @wraps(func)
+        def wrapper(request: Request, *args, **kwargs):
+            try:
+                if request.auth_type.lower() == "bearer":
+                    token = request.user_cred
+                    if token == None or token == "":
+                        raise NotAuthorizedError("Not authenticated.")
+                    request.user = get_by_token(token)
+                else:
+                    # Don't wanna have too many exc
+                    raise NotAuthorizedError("Not authenticated properly.")
+            except (AttributeError, NotAuthorizedError) as e:
+                s = {"e": str(e)}
+                if e.__class__ == AttributeError:
+                    header = {"WWW-Authenticate": "Bearer"}
+                else:
+                    header = {}
+                    s = {**get(request.user_cred[0]).to_dict(), **s}
+                temp = string.Template(UNAUTHORIZED_TMPLT)
+                msg = temp.substitute(s)
+                return Response(401, header, msg)
+            except UserNotFoundError as e:
+                return Response(404, body="Invalid bearer token")
+            except Exception as e:
+                serverly.logger.handle_exception(e)
+                return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+            return func(request, *args, **kwargs)
+        return wrapper
+    return onion
 
 
 def session_auth(func):
@@ -420,6 +439,7 @@ def session_auth(func):
     return wrapper
 
 
+@_requires_user_attr("role")
 def requires_role(role: Union[str, list]):
     """Use this decorator to authenticate the user by their `role`-attribute. Requires the use of another authentication decorator before this one."""
     role = [r.lower() for r in role] if type(role) == list else role.lower()
