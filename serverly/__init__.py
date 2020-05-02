@@ -55,7 +55,7 @@ from serverly.utils import *
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
-version = "0.4.1"
+version = "0.4.2"
 logger = Logger("serverly.log", "serverly", False, False)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)

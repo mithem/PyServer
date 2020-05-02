@@ -18,7 +18,7 @@ use_sessions = False
 persistant_user_attributes = []
 
 
-def use(function: str, method: str, path: str, mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False):
+def use(function: str, method: str, path: str):
     """Serverly comes with builtin API-functions for the following serverly.user functions:
     - authenticate: Basic
     - change: Basic
