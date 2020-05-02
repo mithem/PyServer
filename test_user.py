@@ -32,7 +32,8 @@ def test_setup():
     assert user.algorithm == None
     assert user.salting == 1
 
-    user.setup(filename=FILENAME, user_columns={"first_name": str})
+    user.setup(filename=FILENAME, user_columns={
+               "first_name": str, "email": str, "bearer_token": str, "role": (str, "normal")})
 
     assert type(user._engine) == sqlalchemy.engine.base.Engine
     assert type(user._Session) == sqlalchemy.orm.session.sessionmaker
@@ -103,4 +104,4 @@ def test_clean_user_object():
     u.first_name = "Timmy"
     n = serverly.utils.clean_user_object(u)
     assert n == {"username": "helloworld",
-                 "birth_year": 1970, "first_name": "Timmy"}
+                 "birth_year": 1970, "first_name": "Timmy", "email": None, "role": None}
