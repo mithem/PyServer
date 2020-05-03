@@ -2,13 +2,14 @@
 
 See the Postman documentation online: https://documenter.getpostman.com/view/10720102/Szf549XF?version=latest
 """
+import string
+from functools import wraps
+
 import serverly
+import serverly.user
 import serverly.utils
 from serverly import Request, Response, error_response
-from serverly.user import err
-from serverly.user import basic_auth, bearer_auth
-import serverly.user
-from functools import wraps
+from serverly.user import basic_auth, bearer_auth, err, requires_role
 
 _RES_406 = Response(
     406, body="Unable to parse required parameters. Expected username, password.")
@@ -16,6 +17,7 @@ verify_mail = False
 only_user_verified = False
 use_sessions = False
 persistant_user_attributes = []
+_reversed_api = {}
 
 
 def use(function: str, method: str, path: str):
@@ -25,12 +27,16 @@ def use(function: str, method: str, path: str):
     - delete: Basic
     - get: Basic
     - register: None
-    - sessions.post: Basic (create new session or append to existing one)
-    - sessions.get: Basic (get all sessions of user)
-    - sessions.delete: Basic (delete all sessions of user)
-    - bearer.authenticate: Bearer (authenticate user with Bearer token)
+    - sessions.post: Basic (Create new session or append to existing one)
+    - sessions.get: Basic (Get all sessions of user)
+    - sessions.delete: Basic (Delete all sessions of user)
+    - bearer.authenticate: Bearer (Authenticate user with Bearer token)
     - bearer.new: Basic (Send a new Bearer token to user authenticated via Basic)
+    - console.index: Basic (Entrypoint for serverly's admin console)
+    - console.users: Basic (users overview)
+    - console.summary.users: Basic (API for getting a summary of all users)
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
+    All console functions require the 'admin' role.
     """
     global verify_mail
     supported_funcs = {
@@ -44,13 +50,18 @@ def use(function: str, method: str, path: str):
         "sessions.delete": _api_sessions_delete,
         "bearer.authenticate": _api_bearer_authenticate,
         "bearer.new": _api_bearer_new,
-        "bearer.clear": _api_bearer_clear
+        "bearer.clear": _api_bearer_clear,
+        "console.index": _console_index,
+        "console.users": _console_users,
+        "console.summary.users": _console_summary_users
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
             "function not supported. Supported are " + ", ".join(supported_funcs.keys()) + ".")
+    func = supported_funcs[function.lower()]
     serverly._sitemap.register_site(
-        method, supported_funcs[function.lower()], path)
+        method, func, path)
+    _reversed_api[func.__name__] = path
 
 
 def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, fixed_user_attributes=[]):
@@ -76,6 +87,10 @@ def _check_to_use_sessions(func):
             serverly.user.new_activity(request.user.username, request.address)
         return func(request, *args, **kwargs)
     return wrapper
+
+
+def _get_content(base: str):
+    return string.Template(base).safe_substitute(**_reversed_api)
 
 
 @basic_auth
@@ -169,3 +184,36 @@ def _api_bearer_new(request: Request):
 def _api_bearer_clear(request: Request):
     n = serverly.user.clear_expired_tokens()
     return Response(body=f"Deleted {n} expired tokens.")
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_index(request: Request):
+    content = _get_content(serverly.default_sites.console_index)
+    return Response(body=content)
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_users(request: Request):
+    content = _get_content(serverly.default_sites.console_users)
+    return Response(body=content)
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_summary_users(request: Request):
+    users = serverly.user.get_all()
+
+    n_users = len(users)
+    n_emails = 0
+    n_verified = 0
+
+    for user in users:
+        n_emails += 1 if user.email != None else 0
+        n_verified += 1 if user.verified != None else 0
+
+    return Response(body=f"There are {n_users} users with {n_emails} emails, {n_verified} of which are verified.")
