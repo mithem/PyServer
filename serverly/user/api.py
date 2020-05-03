@@ -33,8 +33,19 @@ def use(function: str, method: str, path: str):
     `function`accepts on of the above. The API-endpoint will be registered for `method`on `path`.
     """
     global verify_mail
-    supported_funcs = {"authenticate": _api_authenticate, "change": _api_change,
-                       "delete": _api_delete, "get": _api_get, "register": _api_register, "sessions.post": _api_sessions_post, "sessions.get": _api_sessions_get, "sessions.delete": _api_sessions_delete, "bearer.authenticate": _api_bearer_authenticate, "bearer.new": _api_bearer_new}
+    supported_funcs = {
+        "authenticate": _api_authenticate,
+        "change": _api_change,
+        "delete": _api_delete,
+        "get": _api_get,
+        "register": _api_register,
+        "sessions.post": _api_sessions_post,
+        "sessions.get": _api_sessions_get,
+        "sessions.delete": _api_sessions_delete,
+        "bearer.authenticate": _api_bearer_authenticate,
+        "bearer.new": _api_bearer_new,
+        "bearer.clear": _api_bearer_clear
+    }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
             "function not supported. Supported are " + ", ".join(supported_funcs.keys()) + ".")
@@ -42,14 +53,14 @@ def use(function: str, method: str, path: str):
         method, supported_funcs[function.lower()], path)
 
 
-def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, *fixed_user_attributes):
+def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, fixed_user_attributes=[]):
     """Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
 
     If `require_user_to_be_verified`, users will only authenticate if their email is verified.
 
     If `use_sessions_when_client_calls_endpoint`, a new user activity will automatically be registered if the client uses an endpoint.
 
-    `fixed_user_attributes` is a list which contains the attribute names of User attributes which may not be changed by the API. Useful for roles.
+    `fixed_user_attributes` is a list which contains the attribute names of User attributes which may not be changed by the API. Useful for roles and other attributes clients may not change (via API).
     """
     global verify_mail, only_user_verified, use_sessions, persistant_user_attributes
     verify_mail = mail_verification
@@ -147,6 +158,14 @@ def _api_bearer_authenticate(request: Request):
 @basic_auth
 @_check_to_use_sessions
 def _api_bearer_new(request: Request):
-    token = serverly.utils.ranstr(50)
-    serverly.user.change(request.user.username, bearer_token=token)
-    return Response(body={"token": token})
+    token = serverly.user.get_new_token(request.user.username, request.obj.get(
+        "scope", []), request.obj.get("expires"))
+    serverly.logger.context = "bearer"
+    return Response(body={"token": token.to_dict()})
+
+
+@basic_auth
+@_check_to_use_sessions
+def _api_bearer_clear(request: Request):
+    n = serverly.user.clear_expired_tokens()
+    return Response(body=f"Deleted {n} expired tokens.")

@@ -321,7 +321,7 @@ class Sitemap:
             else:
                 try:
                     raise UserWarning(
-                        f"Function for '{request.path}' needs to return a Response object. Website will be a warning message (not your content but serverly's).")
+                        f"Function for '{request.path.path}' needs to return a Response object. Website will be a warning message (not your content but serverly's).")
                 except Exception as e:
                     logger.handle_exception(e)
                 response = self.get_func_or_site_response(

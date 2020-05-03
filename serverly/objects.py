@@ -17,6 +17,11 @@ class DBObject:
         for i in dir(self):
             if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict":
                 a = getattr(self, i)
+                if type(a) == str and a[0] == "[":
+                    try:
+                        a = jsonjson.loads(a)
+                    except:
+                        pass
                 # json-serializable
                 if type(a) == str or type(a) == int or type(a) == float or type(a) == dict or type(a) == list or type(a) == bool or a == None:
                     d[i] = a

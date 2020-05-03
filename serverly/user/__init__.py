@@ -24,7 +24,7 @@ session_renew_treshold = 60
 _required_user_attrs = []
 _role_hierarchy = {}
 _engine = None
-_Session = None
+_Session: sqlalchemy.orm.Session = None
 algorithm = None
 salting = 1
 require_verified = False
@@ -36,7 +36,7 @@ Base = declarative_base()
 class User(Base, DBObject):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True)
     password = Column(String)
     salt = Column(String)
@@ -53,7 +53,7 @@ class User(Base, DBObject):
 class Session(Base, DBObject):
     __tablename__ = "sessions"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String)
     start = Column(DateTime)
     end = Column(DateTime)
@@ -67,6 +67,17 @@ class Session(Base, DBObject):
 
     def __str__(self):
         return f"<Session(username={self.username}, start={str(self.start)}, end={str(self.end)}, length={str(self.length)}, address={self.address})"
+
+
+class BearerToken(Base, DBObject):
+    __tablename__ = "bearer_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    expires = Column(DateTime)
+    # custom seperators (;) have to be used as the SQLAlchemy-backend doesn't support Arrays
+    scope = Column(String)
+    username = Column(String)
+    value = Column(String, unique=True)
 
 
 def mockup_hash_algorithm(data: bytes):
@@ -180,8 +191,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
 
     algorithm = hash_algorithm
     salting = int(use_salting)
-    _engine = sqlalchemy.create_engine(
-        "sqlite:///" + filename, echo=verbose)
+    _engine = sqlalchemy.create_engine("sqlite:///" + filename, echo=verbose)
     Base.metadata.create_all(bind=_engine)
     _Session = sqlalchemy.orm.sessionmaker(bind=_engine)
     require_verified = require_email_verification
@@ -279,14 +289,48 @@ def get_by_email(email: str, strict=True):
 
 
 @_setup_required
-def get_by_token(bearer_token: str, strict=True):
+def get_by_token(bearer_token: str, strict=True, expired=True):
+    """Get user associated with `bearer_token`. If `strict`(default), raise UserNotFoundError if user does not exist. Else return None. If `expired` (default), treat user as unauthorized if token is expired."""
     session = _Session()
+    token: BearerToken = session.query(
+        BearerToken).filter_by(value=bearer_token).first()
+    if expired:
+        if strict:
+            if not valid_token(bearer_token, expired):
+                raise UserNotFoundError("No user with token found.")
     result: User = session.query(User).filter_by(
-        bearer_token=bearer_token).first()
+        username=token.username).first()
     session.close()
     if result == None and strict:
         raise UserNotFoundError("No user with token found.")
     return result
+
+
+@_setup_required
+def valid_token(bearer_token: str, expired=True):
+    """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
+    session = _Session()
+    token: BearerToken = session.query(
+        BearerToken).filter_by(value=bearer_token).first()
+    if token.expires == None:
+        expired = False
+    b = token.expires < datetime.datetime.now() if expired else True
+    return b and token != None
+
+
+def clear_expired_tokens():
+    """Delete (permanently) all BearerTokens which are expired and return how many where deleted."""
+    session = _Session()
+    tokens = session.query(BearerToken).filter_by(
+        BearerToken.expires.isnot(None))
+    n = datetime.datetime.now()
+    i = 0
+    for token in tokens:
+        if token.expires < n:
+            session.delete(token)
+            i += 1
+    session.commit()
+    return i
 
 
 @_setup_required
@@ -334,7 +378,7 @@ def delete_all():
 
 @_setup_required
 def get_all_sessions(username: str):
-    """Return all sessions for `username`. `username`=None -> Return all sessions of all users"""
+    """Return all sessions for `username`. `username`= None -> Return all sessions of all users"""
     session = _Session()
     result = session.query(Session).filter_by(username=username).all() if type(
         username) == str else session.query(Session).all()
@@ -396,8 +440,25 @@ def delete_sessions(username: str):
     session.commit()
 
 
+@_setup_required
+def get_new_token(username: str, scope="", expires: datetime.datetime = None):
+    """Generate a new token, save it for `username` and return it (obj)."""
+    session = _Session()
+    token = BearerToken()
+    token.username = str(username)
+    token.scope = str(scope)
+    token.expires = expires
+    # oh yeah! ~9.6x10^59 ages of the universe at 1 trillion guesses per second
+    token.value = serverly.utils.ranstr(50)
+
+    session.add(token)
+
+    session.commit()
+    return token
+
+
 def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
+    """Use this as a decorator to specify that serverly should automatically look for the(via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
     @wraps(func)
     def wrapper(request: Request, *args, **kwargs):
         global require_verified
@@ -425,48 +486,46 @@ def basic_auth(func):
                 e=str(e))
             return Response(404, body=msg)
         except Exception as e:
-            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'basic_auth'-decorator. The specifiy error message is: {str(e)}")
         return func(request, *args, **kwargs)
     return wrapper
 
 
-@_requires_user_attr("bearer_token")
 def bearer_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
-    def onion():
-        @wraps(func)
-        def wrapper(request: Request, *args, **kwargs):
-            try:
-                if request.auth_type.lower() == "bearer":
-                    token = request.user_cred
-                    if token == None or token == "":
-                        raise NotAuthorizedError("Not authenticated.")
-                    request.user = get_by_token(token)
-                else:
-                    # Don't wanna have too many exc
-                    raise NotAuthorizedError("Not authenticated properly.")
-            except (AttributeError, NotAuthorizedError) as e:
-                s = {"e": str(e)}
-                if e.__class__ == AttributeError:
-                    header = {"WWW-Authenticate": "Bearer"}
-                else:
-                    header = {}
-                    s = {**get(request.user_cred[0]).to_dict(), **s}
-                temp = string.Template(UNAUTHORIZED_TMPLT)
-                msg = temp.substitute(s)
-                return Response(401, header, msg)
-            except UserNotFoundError as e:
-                return Response(404, body="Invalid bearer token")
-            except Exception as e:
-                serverly.logger.handle_exception(e)
-                return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'auto_auth'-decorator. The specifiy error message is: {str(e)}")
+    """Use this as a decorator to specify that serverly should automatically look for the(via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
+    @wraps(func)
+    def wrapper(request, *args, **kwargs):
+        try:
+            if request.auth_type.lower() == "bearer":
+                token = request.user_cred
+                if token == None or token == "":
+                    raise NotAuthorizedError("Not authenticated.")
+                request.user = get_by_token(token)
+            else:
+                # Don't wanna have too many exc
+                raise NotAuthorizedError(
+                    "Not authenticated properly.")
             return func(request, *args, **kwargs)
-        return wrapper
-    return onion
+        except (AttributeError, NotAuthorizedError) as e:
+            s = {"e": str(e)}
+            if e.__class__ == AttributeError:
+                header = {"WWW-Authenticate": "Bearer"}
+            else:
+                header = {}
+                s = {**get(request.user_cred[0]).to_dict(), **s}
+            temp = string.Template(UNAUTHORIZED_TMPLT)
+            msg = temp.substitute(s)
+            return Response(401, header, msg)
+        except UserNotFoundError as e:
+            return Response(404, body="Invalid bearer token")
+        except Exception as e:
+            serverly.logger.handle_exception(e)
+            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'bearer_auth'-decorator. The specific error message is: {str(e)}")
+    return wrapper
 
 
 def session_auth(func):
-    """Use this decorator to authenticate the user by the latest session. Requires the use of `bearer_token`s (you don't need to use the decorator but user objects need to have the `bearer_token`-attribute)."""
+    """Use this decorator to authenticate the user by the latest session. Requires the use of `bearer_token`s(you don't need to use the decorator but user objects need to have the `bearer_token`- attribute)."""
     @wraps(func)
     @bearer_auth
     def wrapper(request: Request, *args, **kwargs):
@@ -487,7 +546,7 @@ def session_auth(func):
 
 @_requires_user_attr("role")
 def requires_role(role: Union[str, list]):
-    """Use this decorator to authenticate the user by their `role`-attribute. Requires the use of another authentication decorator before this one."""
+    """Use this decorator to authenticate the user by their `role`- attribute. Requires the use of another authentication decorator before this one."""
     role = [r.lower() for r in role] if type(role) == list else role.lower()
 
     def my_wrap(func):

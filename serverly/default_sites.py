@@ -10,4 +10,4 @@ def general_server_error(req):
 
 
 def user_function_did_not_return_response_object(req):
-    return Response(502, body=f"<html><h3>502 - Bad Gateway.</h3><br />Sorry, there is an error with the function serving this site. Please advise the server administrator that the function for '{req.path}' is not returning a response object.")
+    return Response(502, body=f"<html><h3>502 - Bad Gateway.</h3><br />Sorry, there is an error with the function serving this site. Please advise the server administrator that the function for '{req.path.path}' is not returning a response object.</html>")
