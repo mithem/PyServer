@@ -105,3 +105,40 @@ def test_clean_user_object():
     n = serverly.utils.clean_user_object(u)
     assert n == {"username": "helloworld",
                  "birth_year": 1970, "first_name": "Timmy", "email": None, "role": None}
+
+
+def test_parse_role_hierarchy():
+    e1 = {
+        "normal": "normal",
+        "admin": "normal"
+    }
+    e2 = {
+        "normal": "normal",
+        "admin": "normal",
+        "staff": "admin",
+        "root": "staff",
+        "god": "staff",
+    }
+    e3 = {
+        "normal": "normal",
+        "admin": "normal",
+        "staff": "normal",
+        "root": {"admin", "staff"},
+        "god": "root"
+    }
+
+    r1 = user._parse_role_hierarchy(e1)
+    r2 = user._parse_role_hierarchy(e2)
+    r3 = user._parse_role_hierarchy(e3)
+
+    print(r3)
+
+    assert r1 == {"normal": {"normal"}, "admin": {"normal"}}
+    assert r2 == {"normal": {"normal"}, "admin": {"normal"}, "staff": {
+        "admin", "normal"}, "root": {"admin", "normal", "staff"}, "god": {"admin", "normal", "staff"}}
+    assert r3 == {"normal": {"normal"}, "admin": {"normal"},
+                  "staff": {"normal"}, "root": {"admin", "normal", "staff"}, "god": {"admin", "normal", "staff", "root"}}
+
+
+if __name__ == "__main__":
+    test_parse_role_hierarchy()

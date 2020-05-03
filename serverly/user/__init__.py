@@ -22,6 +22,12 @@ UNAUTHORIZED_TMPLT = "Unauthorized."
 # number of seconds after which a new session will be created instead of increasing the end date
 session_renew_treshold = 60
 _required_user_attrs = []
+_role_hierarchy = {}
+_engine = None
+_Session = None
+algorithm = None
+salting = 1
+require_verified = False
 
 
 Base = declarative_base()
@@ -74,14 +80,39 @@ def mockup_hash_algorithm(data: bytes):
     return HashOutput(data)
 
 
-_engine = None
-_Session = None
-algorithm = None
-salting = 1
-require_verified = False
+# what even is this?? Works pretty well though (currently)!
+def _parse_role_hierarchy(hierarchy: dict):
+    def get_subroles(role: str):
+        def expand(s: set):
+            r = set()
+            if type(s) == str:
+                return [s]
+            for i in s:
+                if type(i) == set:
+                    r.add(expand(i))
+                else:
+                    r.add(i)
+            return r
+        roles = set()
+        for k, v in hierarchy.items():
+            if k == role:
+                if k == v:
+                    roles.add(v)
+                else:
+                    [roles.add(i) for i in expand(v)]
+                    [roles.add(i) for i in get_subroles(v)]
+                    if type(v) == set:
+                        for i in v:
+                            [roles.add(j) for j in get_subroles(i)]
+        return roles
+    hc = {}
+    for k in hierarchy:
+        hc[k] = get_subroles(k)
+
+    return hc
 
 
-def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False):
+def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False, role_hierarchy={}):
     """
 
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
@@ -105,6 +136,19 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     Supported types are str, float, int, bytes, bool, datetime.datetime, datetime.timedelta.
     :param verbose:  (Default value = True) Verbose mode of the SQLite engine
     :param require_email_verification: require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example.
+    :param role_hierarchy: a dictionary with roles as keys & values. If an endpoint requires a role the user does not have explicitly, the user will be authorized if his 'subroles' match de required one(s).
+
+    Example:
+
+    ```python
+    {
+        'normal': 'normal', # required
+        'admin': 'normal',
+        'staff': 'normal'
+        'root': 'admin'
+    }
+    ```
+    Now, admins & staff have the same rights as normals, root has the same as admin & staff (and therefore normals).
 
     """
     global _engine
@@ -112,6 +156,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     global algorithm
     global salting
     global require_verified
+    global _role_hierarchy
 
     python_types_to_sqlalchemy_types = {
         str: String,
@@ -144,6 +189,8 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     for attr in _required_user_attrs:
         if getattr(User, attr, "definetely not a value") == "definetely not a value":
             raise ConfigurationError(f"User does not have attribute '{attr}'")
+
+    _role_hierarchy = _parse_role_hierarchy(role_hierarchy)
 
 
 def _setup_required(func):
@@ -446,11 +493,13 @@ def requires_role(role: Union[str, list]):
     def my_wrap(func):
         @wraps(func)
         def wrapper(request: Request, *args, **kwargs):
+            user_roles = _role_hierarchy.get(request.user.role, set())
             if type(role) == list:
-                if request.user.role.lower() in role:
-                    return func(request, *args, **kwargs)
+                for r in role:
+                    if r == request.user.role or r in user_roles:
+                        return func(request, *args, **kwargs)
             if type(role) == str:
-                if request.user.role.lower() == role:
+                if role == request.user.role or role in user_roles:
                     return func(request, *args, **kwargs)
             return Response(401, body=string.Template(UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict()))
         return wrapper
