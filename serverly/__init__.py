@@ -203,13 +203,35 @@ class StaticSite:
 
 
 def _verify_user(req: Request):
-    try:
-        identifier = req.path.path.split("/")[-1]
-        import serverly.user.mail
-        serverly.user.mail.verify(identifier)
+    identifier = req.path.path.split("/")[-1]
+    import serverly.user.mail
+    r = serverly.user.mail.verify(identifier)
+    if r:
         return Response(body="You're verified 🎉")
-    except KeyError:
-        return Response(404, body="Sorry, but the verification code seems to be invalid.")
+    else:
+        return Response(body="<html><p>Either the verification code is invalid or you already are verified.</p></html>")
+
+
+def _reset_password_user_endpoint(req: Request):
+    from serverly.user import password_reset_page
+    identifier = req.path.path.split("/")[2]
+    return Response(body=string.Template(password_reset_page).safe_substitute(identifier=identifier))
+
+
+def _reset_password_for_real(req: Request):
+    try:
+        if req.auth_type.lower() == "bearer":
+            identifier = req.user_cred
+            import serverly.user.mail
+            r = serverly.user.mail.reset_password(
+                identifier, req.obj["password"])
+            if r:
+                return Response(body="Changed password successfully!")
+            else:
+                return Response(body="Either the identifier is invalid or you already reset your password via this token.")
+        return Response(401, {"WWW-Authenticate": "Bearer"}, "Invalid authentication")
+    except Exception as e:
+        return Response(500, body=str(e))
 
 
 class Sitemap:
@@ -225,9 +247,8 @@ class Sitemap:
         check_relative_path(superpath)
         self.superpath = superpath
         self.methods = {
-            # for verifying users of serverly.user and serverly.user.mail
-            "get": {"^/verify/[\w0-9]+": _verify_user},
-            "post": {},
+            "get": {"^/verify/[\w0-9]+$": _verify_user, "^/reset-password/[\w0-9]+$": _reset_password_user_endpoint},
+            "post": {"^/api/resetpassword/?$": _reset_password_for_real},
             "put": {},
             "delete": {}
         }
@@ -321,7 +342,7 @@ class Sitemap:
             else:
                 try:
                     raise UserWarning(
-                        f"Function for '{request.path.path}' needs to return a Response object. Website will be a warning message (not your content but serverly's).")
+                        f"Function for '{request.path.path}' ({site.__name__})needs to return a Response object. Website will be a warning message (not your content but serverly's).")
                 except Exception as e:
                     logger.handle_exception(e)
                 response = self.get_func_or_site_response(

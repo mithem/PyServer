@@ -28,6 +28,7 @@ _Session: sqlalchemy.orm.Session = None
 algorithm = None
 salting = 1
 require_verified = False
+password_reset_page = """<!DOCTYPE html><html lang="en_US"><head><title>Reset password</title></head><body><script>var password = prompt("Your new password?");var req = new XMLHttpRequest();req.onreadystatechange= () => {if(req.readyState===4){alert(req.status);alert(req.responseText);}}; req.open("POST", "SUPERPATH/api/resetpassword"); req.setRequestHeader("Authorization", "Bearer ${identifier}");req.send(JSON.stringify({password: password}));</script></body></html>"""
 
 
 Base = declarative_base()
