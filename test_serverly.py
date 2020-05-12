@@ -75,9 +75,74 @@ def test_response():
     assert res.obj == None
 
 
+def test_response_2():
+    from serverly.user import User
+    u = User()
+    u.id = 1
+    u.username = "oh yeah!"
+    u.password = "totallyhashed"
+    u.salt = "totallyrandom"
+    res = serverly.Response(body=u)
+
+    d = {
+        "id": 1,
+        "username": "oh yeah!",
+        "password": "totallyhashed",
+        "salt": "totallyrandom"
+    }
+
+    assert res.headers["Content-type"] == "application/json"
+
+    assert res.code == 200
+    assert res.obj == d
+
+
+def test_response_3():
+    d = {"hello": True, "wow": 12}
+
+    res = serverly.Response(body=d)
+
+    assert res.obj == d
+    assert res.body == json.dumps(d)
+
+
+def test_response_4():
+    d = ["a", "b", "c", 4, 6, 7]
+
+    res = serverly.Response(body=d)
+
+    assert res.body == json.dumps(d)
+    assert res.obj == d
+
+
 def test_ranstr():
-    for _ in range(100):
-        assert len(serverly.utils.ranstr()) == 20
+    s = []
+    for _ in range(10000):
+        r = serverly.utils.ranstr()
+        assert len(r) == 20
+        assert not r in s
+        s.append(r)
+
+
+def test_guess_response_headers():
+    c1 = "<html lang='en_US'><h1>Hello World!</h1></html>"
+    h1 = {"Content-type": "text/html", "Content-Length": len(c1)}
+    assert serverly.utils.guess_response_headers(c1) == h1
+
+    c2 = "Hello there!"
+    h2 = {"Content-type": "text/plain", "Content-Length": len(c2)}
+    assert serverly.utils.guess_response_headers(c2) == h2
+
+    c3 = {"hello": True}
+    h3 = {"Content-type": "application/json",
+          "Content-Length": len(json.dumps(c3))}
+    assert serverly.utils.guess_response_headers(c3) == h3
+
+    c4 = {"id": 1, "password": "totallyhashed",
+          "salt": "totallyrandom", "username": "oh yeah!"}
+    h4 = {"Content-type": "application/json",
+          "Content-Length": len(json.dumps(c4))}
+    assert serverly.utils.guess_response_headers(c4) == h4
 
 
 @pytest.mark.skip
@@ -123,3 +188,7 @@ def test_server():
     evaluate()
 
     p.terminate()
+
+
+if __name__ == "__main__":
+    test_response_3()
