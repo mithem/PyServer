@@ -11,21 +11,18 @@ import yagmail
 from serverly.utils import ranstr
 from serverly.user import _requires_user_attr
 
-_default_verification_subject = "Your recent registration"
-_default_verification_template = """Hey $username,
-thank you for registering for our service. Please click <a href='$verification_url'>this link</a> to verify your email.
-
-If you cannot click the link for some reason, you can also just copy/paste it:
-$verification_url
-"""
 _default_special_emails = {
     "verification": {
         "subject": "Your recent registration",
-        "content": "Hey $username,\nthank you for signing up for our service. Please click <a href='$verification_url'>this link</a> to verify your email.\n\nIf you cannot click the link for some reason, you can also just copy/paste it:\n$verification_url"
+        "content": f"Hey $username,\nthank you for signing up for our service. Please click <a href='$verification'>this link</a> to verify your email.\n\nIf you cannot click the link for some reason, you can also just copy/paste it: \n$verification"
+    },
+    "confirmation": {
+        "subject": "Please verify your email",
+        "content": f"Hey $username,\nwe'd appreciate if you could verify your email by clicking <a href='$confirmation'>this link</a>, just in case!\n\nIf you cannot click the link for some reason, you can also just copy/paste it: \n$confirmation"
     },
     "password_reset": {
         "subject": "You lost your password?",
-        "content": "Hi $username,\nit looks like you recently requested to change your password. You can use <a href='$password_reset_url'>this link</a> to reset it.\n\nTip: If you cannot the link above, try copy/pasting it in your browser: $password_reset_url\n\nAnother one: If you didn't request this, you can just delete this email."
+        "content": "Hi $username,\nit looks like you recently requested to change your password. You can use <a href='$password_reset'>this link</a> to reset it.\n\nTip: If you cannot the link above, try copy/pasting it in your browser: $password_reset\n\nAnother one: If you didn't request this, you can just delete this email."
     }
 }
 
@@ -104,8 +101,15 @@ class MailManager:
     @special_emails.setter
     def special_emails(self, special_emails: dict):
         """For docstrings, see MailManager.__init__()"""
-        self._special_emails = {**_default_special_emails,
-                                **self.special_emails, **special_emails}
+        try:
+            self._special_emails = {**_default_special_emails,
+                                    **self.special_emails, **special_emails}
+        except TypeError:  # there must be a better way 🤔
+            try:
+                self._special_emails = {
+                    **_default_special_emails, **self.special_emails}
+            except TypeError:
+                self._special_emails = _default_special_emails
 
     @property
     def online_url(self):
@@ -126,7 +130,8 @@ class MailManager:
             elif email == None:
                 return serverly.logger.warning("Cannot send email: Neither username nor email provided.", extra_context="MailManager")
             else:
-                user = serverly.user.get_by_email(email)
+                if substitute:
+                    user = serverly.user.get_by_email(email)
             if substitute:
                 subject_temp = string.Template(subject)
                 content_temp = string.Template(content)
@@ -138,7 +143,8 @@ class MailManager:
 
             self.yag.send(email, subject, content, attachments)
             if self.debug:
-                serverly.logger.success(f"Sent mail to {email}!")
+                serverly.logger.success(
+                    f"Sent mail to {email if email != None else user.email}!")
         except KeyboardInterrupt:
             pass
         except Exception as e:
@@ -199,7 +205,7 @@ class MailManager:
                 def send():
                     try:
                         self.send(mail["subject"], mail.get("content", ""),
-                                  mail.get("attachments", None), mail.get("username", None), mail.get("email", None), True)
+                                  mail.get("attachments", None), mail.get("username", None), mail.get("email", None), mail.get("substitute", True))
                         self.pending.pop(self.pending.index(mail))
                         self._save()
                     except KeyboardInterrupt:
@@ -287,21 +293,32 @@ class MailManager:
         """:param type: email type as a key in MailManager.special_emails, e.g. 'verification'
 
         Raises KeyError if type is not defined."""
-        mail = self.special_emails[type_]
-        mail["subject"] = string.Template(
-            mail["subject"]).safe_substitute(**substitutions)
-        mail["content"] = string.Template(
-            mail["content"]).safe_substitute(**substitutions)
-        return mail
-
-    def schedule_verification_mail(self, username: str):
-        identifier = ranstr()
-        verification_url = self.online_url + \
-            serverly._sitemap.superpath + "verify/" + identifier
-        mail = self.get_substituted_mail(
-            "verification", **serverly.user.get(username).to_dict(), verification_url=verification_url)
-        mail["username"] = username
         try:
+            mail = self.special_emails[type_].copy()
+            mail["subject"] = string.Template(
+                mail["subject"]).safe_substitute(**substitutions)
+            mail["content"] = string.Template(
+                mail["content"]).safe_substitute(**substitutions)
+            return mail
+        except TypeError:
+            raise KeyError(f"mailtype (got {type_})")
+
+    def _identifier_based_special_mail(self, email_type: str, username: str, path: str):
+        def get_func_path(path: str):
+            path = path[1:] if path[0] == "/" else path
+            path = path + "/" if path[-1] != "/" else path
+            return path
+        try:
+            identifier = ranstr()
+            url = self.online_url + \
+                serverly._sitemap.superpath + \
+                get_func_path(path) + identifier
+            subs = {}
+            for k in self.special_emails.keys():
+                subs[k] = url
+            mail = self.get_substituted_mail(
+                email_type, **serverly.user.get(username).to_dict(), **subs)
+            mail["username"] = username
             self.schedule(mail)
             try:
                 with open("mailmanager.json", "r") as f:
@@ -311,41 +328,32 @@ class MailManager:
                         data = {}
             except FileNotFoundError:
                 with open("mailmanager.json", "w+") as f:
-                    data = {"mail_verifications": {}, 'password_reset_ids': {}}
-                    f.write(
-                        "{'mail_verifications': {}, 'password_reset_ids': {}}")
-            data["mail_verifications"][identifier] = username
+                    data = {"verification": {},
+                            'password_reset': {},
+                            "confirmation": {}
+                            }
+                    json.dump(data, f)
+            data[email_type][identifier] = username
             with open("mailmanager.json", "w") as f:
                 json.dump(data, f)
         except Exception as e:
             serverly.logger.handle_exception(e)
+            raise e
+
+    def schedule_verification_mail(self, username: str):
+        self._identifier_based_special_mail(
+            "verification", username, "verify/")
+
+    def schedule_confirmation_mail(self, username: str):
+        self._identifier_based_special_mail(
+            "confirmation", username, "confirm/")
 
     def schedule_password_reset_mail(self, username: str):
         identifier = ranstr()
         password_reset_url = self.online_url + \
             serverly._sitemap.superpath + "reset-password/" + identifier
-        mail = self.get_substituted_mail(
-            "password_reset", **serverly.user.get(username).to_dict(), password_reset_url=password_reset_url)
-        mail["username"] = username
-
-        try:
-            self.schedule(mail)
-            try:
-                with open("mailmanager.json", "r") as f:
-                    try:
-                        data = json.load(f)
-                    except:
-                        data = {}
-            except FileNotFoundError:
-                with open("mailmanager.json", "w+") as f:
-                    data = {"mail_verifications": {}, 'password_reset_ids': {}}
-                    f.write(
-                        "{'mail_verifications': {}, 'password_reset_ids': {}}")
-            data["password_reset_ids"][identifier] = username
-            with open("mailmanager.json", "w") as f:
-                json.dump(data, f)
-        except Exception as e:
-            serverly.logger.handle_exception(e)
+        self._identifier_based_special_mail(
+            "password_reset", username, "reset-password/")
 
 
 @_requires_user_attr("verified")
@@ -353,13 +361,32 @@ def verify(identifier: str):
     try:
         with open("mailmanager.json", "r") as f:
             data = json.load(f)
-        for identi, username in data["mail_verifications"].items():
+        for identi, username in data["verification"].items():
             if identi == identifier:
                 serverly.user.change(username, verified=True)
-                del data["mail_verifications"][identifier]
+                del data["verification"][identifier]
                 with open("mailmanager.json", "w") as f:
                     json.dump(data, f)
                 serverly.logger.success(f"verified email of {username}!")
+                return True
+        return False
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        raise e
+
+
+@_requires_user_attr("verified")
+def confirm(identifier: str):
+    try:
+        with open("mailmanager.json", "r") as f:
+            data = json.load(f)
+        for identi, username in data["confirmation"].items():
+            if identi == identifier:
+                serverly.user.change(username, verified=True)
+                del data["confirmation"][identifier]
+                with open("mailmanager.json", "w") as f:
+                    json.dump(data, f)
+                serverly.logger.success(f"confirmed email of {username}!")
                 return True
         return False
     except Exception as e:
@@ -371,10 +398,10 @@ def reset_password(identifier: str, password: str):
     try:
         with open("mailmanager.json", "r") as f:
             data = json.load(f)
-        for identi, username in data["password_reset_ids"].items():
+        for identi, username in data["password_reset"].items():
             if identi == identifier:
                 serverly.user.change(username, password=password)
-                del data["password_reset_ids"][identifier]
+                del data["password_reset"][identifier]
                 with open("mailmanager.json", "w") as f:
                     json.dump(data, f)
                 serverly.logger.success(f"Changed password of {username}!")

@@ -28,7 +28,6 @@ _Session: sqlalchemy.orm.Session = None
 algorithm = None
 salting = 1
 require_verified = False
-password_reset_page = """<!DOCTYPE html><html lang="en_US"><head><title>Reset password</title></head><body><script>var password = prompt("Your new password?");var req = new XMLHttpRequest();req.onreadystatechange= () => {if(req.readyState===4){alert(req.status);alert(req.responseText);}}; req.open("POST", "SUPERPATH/api/resetpassword"); req.setRequestHeader("Authorization", "Bearer ${identifier}");req.send(JSON.stringify({password: password}));</script></body></html>"""
 
 
 Base = declarative_base()
@@ -229,25 +228,34 @@ def _requires_user_attr(attribute: str):
 
 @_setup_required
 def register(username: str, password: str, **kwargs):
-    session = _Session()
-    user = User()
-    user.username = username
-    for attname, value in kwargs.items():
-        setattr(user, attname, value)
-    salt = ranstr()
-    user.salt = salt
-    user.password = algorithm(
-        bytes(salt * salting + password, "utf-8")).hexdigest()
-
-    session.add(user)
-
     try:
-        session.commit()
-    except sqlalchemy.exc.IntegrityError:
-        raise UserAlreadyExistsError(
-            "User '" + username + "'" + " already exists")
-    finally:
-        session.close()
+        if username == None:
+            raise ValueError("username expected.")
+        if password == None:
+            raise ValueError("password expected.")
+
+        session = _Session()
+        user = User()
+        user.username = username
+        for attname, value in kwargs.items():
+            setattr(user, attname, value)
+        salt = ranstr()
+        user.salt = salt
+        user.password = algorithm(
+            bytes(salt * salting + password, "utf-8")).hexdigest()
+
+        session.add(user)
+
+        try:
+            session.commit()
+        except sqlalchemy.exc.IntegrityError:
+            raise UserAlreadyExistsError(
+                "User '" + username + "'" + " already exists")
+        finally:
+            session.close()
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        raise e
 
 
 @_setup_required
@@ -256,7 +264,7 @@ def authenticate(username: str, password: str, strict=False, verified=False):
     session = _Session()
     req_user = session.query(User).filter_by(username=username).first()
     result = compare_digest(req_user.password, algorithm(
-        bytes(req_user.salt * salting + password, "utf-8")).hexdigest())
+        bytes(req_user.salt * salting + str(password), "utf-8")).hexdigest())
     if verified:
         result = result and req_user.verified
     if strict:
@@ -308,6 +316,17 @@ def get_by_token(bearer_token: str, strict=True, expired=True):
 
 
 @_setup_required
+def get_by_id(identifier: int, strict=True):
+    """Get user with `identifier` (id). If `strict`(default), raise UserNotFoundError if user does not exist. Else return None."""
+    session = _Session()
+    result: User = session.query(User).filter_by(id=identifier).first()
+    session.close()
+    if result == None and strict:
+        raise UserNotFoundError(f"User with id {id} not found.")
+    return result
+
+
+@_setup_required
 def valid_token(bearer_token: str, expired=True):
     """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
     session = _Session()
@@ -345,18 +364,33 @@ def get_all():
 
 @_setup_required
 def change(username: str, new_username: str = None, password: str = None, **kwargs):
-    session = _Session()
-    user = get(username)
-    update_dict = {}
-    if new_username != None:
-        update_dict[User.username] = new_username
-    if password != None:
-        update_dict[User.password] = algorithm(
-            bytes(user.salt * salting + password, "utf-8")).hexdigest()
-    for key, value in kwargs.items():
-        update_dict[getattr(User, key)] = value
-    session.query(User).update(update_dict)
-    session.commit()
+    try:
+        important_attributes = ["username", "password", "salt", "id"]
+        session = _Session()
+        user = get(username)
+        update_dict = {}
+        if new_username != None:
+            update_dict[User.username] = new_username
+        if password != None:
+            update_dict[User.password] = algorithm(
+                bytes(user.salt * salting + password, "utf-8")).hexdigest()
+        for key, value in kwargs.items():
+            update_dict[getattr(User, key)] = value
+        to_delete = []
+        for key, value in update_dict.items():
+            k = str(key).replace("User.", "")
+            serverly.logger.debug(k, True)
+            if value == None and k in important_attributes:
+                to_delete.append(key)
+        for i in to_delete:
+            del update_dict[i]
+        serverly.logger.debug(update_dict, True)
+
+        session.query(User).update(update_dict)
+        session.commit()
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        raise e
 
 
 @_setup_required
@@ -459,7 +493,7 @@ def get_new_token(username: str, scope="", expires: datetime.datetime = None):
 
 
 def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the(via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
+    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
     @wraps(func)
     def wrapper(request: Request, *args, **kwargs):
         global require_verified
@@ -479,15 +513,16 @@ def basic_auth(func):
                 header = {}
                 s = {**get(request.user_cred[0]).to_dict(), **s}
             temp = string.Template(UNAUTHORIZED_TMPLT)
-            msg = temp.substitute(s)
+            msg = temp.safe_substitute(s)
             return Response(401, header, msg)
         except UserNotFoundError as e:
             temp = string.Template(USER_NOT_FOUND_TMPLT)
-            msg = temp.substitute(
+            msg = temp.safe_substitute(
                 e=str(e))
             return Response(404, body=msg)
         except Exception as e:
-            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'basic_auth'-decorator. The specifiy error message is: {str(e)}")
+            serverly.logger.handle_exception(e)
+            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'basic_auth'-decorator. The specific error message is: {str(e)}")
         return func(request, *args, **kwargs)
     return wrapper
 

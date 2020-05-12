@@ -16,3 +16,4 @@ favicon.ico
 *.db
 reset.py
 Dockerfile
+console/

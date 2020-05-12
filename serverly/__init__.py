@@ -35,7 +35,6 @@ def hello_world(data):
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """
 import importlib
-import mimetypes
 import multiprocessing
 import re
 import time
@@ -56,7 +55,7 @@ description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
 version = "0.4.2"
-logger = Logger("serverly.log", "serverly", False, False)
+logger = Logger("serverly.log", "serverly", False, True)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
 error_response_templates = {}
@@ -187,9 +186,9 @@ class StaticSite:
         check_relative_path(path)
         self.file_path = check_relative_file_path(file_path)
         if path[0] != "^":
-            path = "^" + path
+            path += "^"
         if path[-1] != "$":
-            path = path + "$"
+            path += "$"
         self.path = path
 
     def get_content(self):
@@ -199,7 +198,8 @@ class StaticSite:
         else:
             with open(self.file_path, "r") as f:
                 content = f.read()
-        return content
+        type_ = mimetypes.guess_type(self.file_path)[0]
+        return Response(headers={"Content-type": type_}, body=content)
 
 
 def _verify_user(req: Request):
@@ -207,15 +207,24 @@ def _verify_user(req: Request):
     import serverly.user.mail
     r = serverly.user.mail.verify(identifier)
     if r:
-        return Response(body="You're verified 🎉")
+        return Response(body="<html><head><meta charset='utf-8'/></head><pre>You're verified 🎉</pre></html>")
+    else:
+        return Response(body="<html><p>Either the verification code is invalid or you already are verified.</p></html>")
+
+
+def _confirm_user(req: Request):
+    identifier = req.path.path.split("/")[-1]
+    import serverly.user.mail
+    r = serverly.user.mail.confirm(identifier)
+    if r:
+        return Response(body="<html><head><meta charset='utf-8'/></head><pre>You're verified 🎉</pre></html>")
     else:
         return Response(body="<html><p>Either the verification code is invalid or you already are verified.</p></html>")
 
 
 def _reset_password_user_endpoint(req: Request):
-    from serverly.user import password_reset_page
     identifier = req.path.path.split("/")[2]
-    return Response(body=string.Template(password_reset_page).safe_substitute(identifier=identifier))
+    return Response(body=string.Template(serverly.default_sites.password_reset_page).safe_substitute(identifier=identifier))
 
 
 def _reset_password_for_real(req: Request):
@@ -235,7 +244,7 @@ def _reset_password_for_real(req: Request):
 
 
 class Sitemap:
-    def __init__(self, superpath: str = "/", error_page: dict = None):
+    def __init__(self, superpath: str = "/", error_page: dict = None, debug=False):
         """
         Create a new Sitemap instance
         :param superpath: path which will replace every occurence of '/SUPERPATH/' or 'SUPERPATH/'. Great for accessing multiple servers from one domain and forwarding the requests to this server.
@@ -246,8 +255,9 @@ class Sitemap:
         """
         check_relative_path(superpath)
         self.superpath = superpath
+        self.debug = debug
         self.methods = {
-            "get": {"^/verify/[\w0-9]+$": _verify_user, "^/reset-password/[\w0-9]+$": _reset_password_user_endpoint},
+            "get": {"^/verify/[\w0-9]+$": _verify_user, "^/reset-password/[\w0-9]+$": _reset_password_user_endpoint, "^/confirm/[\w0-9]+$": _confirm_user},
             "post": {"^/api/resetpassword/?$": _reset_password_for_real},
             "put": {},
             "delete": {}
@@ -314,42 +324,58 @@ class Sitemap:
                 f"Site for path '{path}' not found. Cannot be unregistered.")
 
     def get_func_or_site_response(self, site, request: Request):
-        response = Response()
-        if isinstance(site, StaticSite):
-            response = Response(body=site.get_content())
-        elif callable(site):
-            try:
-                content = site(request)
-            except TypeError as e:  # makes debugging easier
-                serverly.logger.handle_exception(e)
-                try:
-                    content = site()
-                except TypeError as e:
-                    logger.handle_exception(e)
-                    raise TypeError(
-                        f"Function '{site.__name__}' either takes to many arguments (only object of type Request provided) or raises a TypeError")
-                except Exception as e:
-                    logger.handle_exception(e)
-                    content = "500 - Internal server error - " + str(e)
-                    raise e
-            except Exception as e:
-                logger.handle_exception(e)
-                content = "500 - Internal server error - " + str(e)
-                raise e
-            response = Response(200, {}, "")
-            if isinstance(content, Response):
-                response = content
+        try:
+            response = Response()
+            if isinstance(site, StaticSite):
+                response = site.get_content()
             else:
                 try:
-                    raise UserWarning(
-                        f"Function for '{request.path.path}' ({site.__name__})needs to return a Response object. Website will be a warning message (not your content but serverly's).")
+                    content = site(request)
+                except TypeError as e:  # makes debugging easier
+                    serverly.logger.handle_exception(e)
+                    try:
+                        content = site()
+                    except TypeError as e:
+                        logger.handle_exception(e)
+                        raise TypeError(
+                            f"Function '{site.__name__}' either takes to many arguments (only object of type Request provided) or raises a TypeError")
+                    except Exception as e:
+                        serverly.logger.debug(
+                            "Site: " + site.__name__, self.debug)
+                        logger.handle_exception(e)
+                        content = Response(
+                            500, body=f"500 - Internal server error - {e}")
+                        raise e
                 except Exception as e:
+                    serverly.logger.debug("Site: " + site.__name__, self.debug)
                     logger.handle_exception(e)
-                response = self.get_func_or_site_response(
-                    self.error_page.get(942, self.error_page[0]), request)
-        response.body = response.body.replace(
-            "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
-        return response
+                    content = Response(
+                        500, body=f"500 - Internal server error - {e}")
+                    raise e
+                if isinstance(content, Response):
+                    response = content
+                else:
+                    try:
+                        raise UserWarning(
+                            f"Function for '{request.path.path}' ({site.__name__}) needs to return a Response object. Website will be a warning message (not your content but serverly's).")
+                    except Exception as e:
+                        logger.handle_exception(e)
+                    response = self.get_func_or_site_response(
+                        self.error_page.get(942, self.error_page[0]), request)
+            headers = response.headers
+            for k, v in headers.items():
+                try:
+                    headers[k] = v.replace(
+                        "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+                except:
+                    pass
+            response.headers = headers
+            response.body = response.body.replace(
+                "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+            return response
+        except Exception as e:
+            logger.handle_exception(e)
+            return error_response(500, str(e))
 
     def get_content(self, request: Request):
         site = None
@@ -410,17 +436,18 @@ def unregister(method: str, path: str):
     _sitemap.unregister_site(method, path)
 
 
-def _start_server(superpath: str):
+def _start_server(superpath: str, debug=False):
     _sitemap.superpath = superpath
+    _sitemap.debug = debug
     _server = Server(address)
     _server.run()
 
 
-def start(superpath: str = '/', mail_active=False):
+def start(superpath: str = '/', mail_active=False, debug=False):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     try:
-        logger.autosave = True
-        args = tuple([superpath])
+        logger.verbose = debug
+        args = tuple([superpath, debug])
         server = multiprocessing.Process(
             target=_start_server, args=args)
         if mail_active:

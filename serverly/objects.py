@@ -6,7 +6,7 @@ import urllib.parse
 import warnings
 from typing import Union
 
-from serverly.utils import get_http_method_type, guess_response_info
+from serverly.utils import get_http_method_type, guess_response_headers, is_json_serializable
 
 
 class DBObject:
@@ -23,7 +23,7 @@ class DBObject:
                     except:
                         pass
                 # json-serializable
-                if type(a) == str or type(a) == int or type(a) == float or type(a) == dict or type(a) == list or type(a) == bool or a == None:
+                if is_json_serializable(a):
                     d[i] = a
                 elif issubclass(type(a), DBObject):
                     d[i] = a.to_dict()
@@ -53,7 +53,8 @@ class CommunicationObject:
 
     @headers.setter
     def headers(self, headers: dict):
-        self._headers = {**guess_response_info(self.body), **headers}
+        o = self.obj if self.obj != None else self.body
+        self._headers = {**guess_response_headers(o), **headers}
 
     @property
     def body(self):
@@ -61,19 +62,28 @@ class CommunicationObject:
 
     @body.setter
     def body(self, body: Union[str, dict, list, DBObject]):
-        if type(body) == dict or type(body) == list:
-            self._obj = body
-            self._body = jsonjson.dumps(body)
-        elif type(body) == str:
-            self._body = body
-            try:
-                self._obj = jsonjson.loads(body)
-            except jsonjson.JSONDecodeError:
-                self._obj = None
-        elif issubclass(body.__class__, DBObject):
-            d = body.to_dict()
-            self._body = jsonjson.dumps(d)
-            self._obj = body
+        def listify(a):
+            for i in a:
+                b = []
+                b.append(dictify(a))
+                return b
+
+        def dictify(a):
+            if type(a) == dict or type(a) == list:
+                try:
+                    return jsonjson.dumps(a), a
+                except:
+                    return listify(a), a
+            elif type(a) == str:
+                try:
+                    obj = jsonjson.loads(a)
+                except jsonjson.JSONDecodeError:
+                    obj = None
+                return a, obj
+            elif issubclass(a.__class__, DBObject):
+                d = a.to_dict()
+                return jsonjson.dumps(d), d
+        self._body, self._obj = dictify(body)
 
 
 class Request(CommunicationObject):

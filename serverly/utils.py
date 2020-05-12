@@ -4,6 +4,7 @@ import random
 import string
 import copy
 import serverly
+import mimetypes
 
 
 def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
@@ -64,32 +65,37 @@ def parse_response_info(info: dict, content_length=0):
 
 
 def guess_filetype_on_filename(filename):
-    file_types = {
-        "html": "text/html"
-    }
-    ext = filename.split(".")[-1]
-    return file_types.get(ext.lower(), "text/plain")
+    return mimetypes.guess_type(filename)
 
 
-def guess_response_info(content: str):
-    if content.startswith("<!DOCTYPE html>") or content.startswith("<html"):
-        c_type = "text/html"
-    else:
-        try:
-            if type(content) == str:
-                json.loads(content)
-            else:
-                json.dumps(content)
-            c_type = "application/json"
-        except json.JSONDecodeError:
+def is_json_serializable(obj):
+    return type(obj) == str or type(obj) == int or type(obj) == float or type(obj) == dict or type(obj) == list or type(obj) == bool or obj == None
+
+
+def guess_response_headers(content):
+    if type(content) == str:
+        if content.startswith("<!DOCTYPE html>") or content.startswith("<html") or content.startswith("<head") or content.startswith("<body"):
+            c_type = "text/html"
+        else:
             c_type = "text/plain"
-    return {"Content-type": c_type, "Content-Length": len(content)}
+        l = len(content)
+    elif is_json_serializable(content):
+        c_type = "application/json"
+        l = len(json.dumps(content))
+    else:
+        c_type = "text/plain"
+        l = len(content)
+    return {"Content-Length": l, "Content-type": c_type}
 
 
-def clean_user_object(user_s):
-    """return cleaned version (dict!!!) of object passed in. user_s can be of type User or list[User]."""
+def clean_user_object(user_s, *allow):
+    """return cleaned version (dict!!!) of object passed in. user_s can be of type User or list[User]. *allow can be used to allow otherwise automatically removed attributes."""
     bad_attributes = ["id", "password", "salt",
                       "bearer_token", "metadata", "to_dict"]
+
+    for i in allow:
+        if i in bad_attributes:
+            bad_attributes.pop(bad_attributes.index(i))
 
     def clean(u):
         new = {}
