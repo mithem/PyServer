@@ -82,9 +82,13 @@ def guess_response_headers(content):
     elif is_json_serializable(content):
         c_type = "application/json"
         l = len(json.dumps(content))
+    elif hasattr(content, "read"):
+        c_type = mimetypes.guess_type(content.name)[0]
+        l = len(content.read())
     else:
         c_type = "text/plain"
         l = len(content)
+    print(c_type, l)
     return {"Content-Length": l, "Content-type": c_type}
 
 

@@ -2,11 +2,14 @@ import base64
 import collections.abc
 import datetime
 import json as jsonjson
+import mimetypes
 import urllib.parse
 import warnings
 from typing import Union
 
-from serverly.utils import get_http_method_type, guess_response_headers, is_json_serializable
+
+from serverly.utils import (get_http_method_type, guess_response_headers,
+                            is_json_serializable)
 
 
 class DBObject:
@@ -53,8 +56,9 @@ class CommunicationObject:
 
     @headers.setter
     def headers(self, headers: dict):
-        o = self.obj if self.obj != None else self.body
-        self._headers = {**guess_response_headers(o), **headers}
+        o = self.obj if self.obj else self.body
+        self._headers = {
+            **guess_response_headers(o), **self.headers, **headers}
 
     @property
     def body(self):
@@ -83,7 +87,16 @@ class CommunicationObject:
             elif issubclass(a.__class__, DBObject):
                 d = a.to_dict()
                 return jsonjson.dumps(d), d
+            else:
+                c = a.read()
+                self._headers = {
+                    "Content-type": mimetypes.guess_type(a.name)[0], "Content-Length": len(c)}
+                return c, a
         self._body, self._obj = dictify(body)
+
+    def __del__(self):
+        if hasattr(self.obj, "read"):
+            self.obj.close()
 
 
 class Request(CommunicationObject):
