@@ -3,13 +3,13 @@ import collections.abc
 import datetime
 import json as jsonjson
 import mimetypes
+import os
 import urllib.parse
 import warnings
 from typing import Union
 
-
 from serverly.utils import (get_http_method_type, guess_response_headers,
-                            is_json_serializable)
+                            is_json_serializable, check_relative_path, check_relative_file_path)
 
 
 class DBObject:
@@ -163,8 +163,32 @@ class Redirect(Response):
         super().__init__(code, {"Location": path})
 
 
-class Resource():
-    """An API resource specifying how an endpoint looks."""
+class StaticSite:
+    def __init__(self, path: str, file_path: str):
+        check_relative_path(path)
+        self.file_path = check_relative_file_path(file_path)
+        if path[0] != "^":
+            path = "^" + path
+        if path[-1] != "$":
+            path += "$"
+        self.path = path
+
+    def get_content(self):
+        content = ""
+        if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
+            content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
+        else:
+            with open(self.file_path, "r") as f:
+                content = f.read()
+        type_ = mimetypes.guess_type(self.file_path)[0]
+        return Response(headers={"Content-type": type_}, body=content)
+
+
+class Resource:
+    """An API resource specifying how an endpoint looks."""  # TODO documentation
+
+    __path__ = ""
+    __map__ = {}
 
     def use(self):
         """register endpoints specified in Resource attributes"""
@@ -176,19 +200,34 @@ class Resource():
             except TypeError:
                 subclass = issubclass(type(v), Resource)
             if subclass:
-                v.path = (self.path + v.path).replace("//", "/")
+                v.path = (self.__path__ + v.path).replace("//", "/")
                 v.use()
             elif callable(v):
                 try:
-                    serverly.register_function(k[0], self.path + k[1], v)
+                    serverly.register_function(k[0], self.__path__ + k[1], v)
                 except Exception as e:
                     serverly.logger.handle_exception(e)
             elif type(v) == serverly.StaticSite:
-                serverly._sitemap.register_site(k[0], v, self.path + k[1])
+                serverly._sitemap.register_site(k[0], v, self.__path__ + k[1])
             elif type(v) == str:
-                new_path = self.path + k[1]
+                new_path = self.__path__ + k[1]
                 s = serverly.StaticSite(new_path, v)
-                serverly._sitemap.register_site(k[0], s, self.path + k[1])
+                serverly._sitemap.register_site(k[0], s, self.__path__ + k[1])
         serverly.logger.context = "registration"
         serverly.logger.success(
             f"Registered Resource '{type(self).__name__}' for base path '{self.path}'.", False)
+
+
+class StaticResource(Resource):
+    path = ""
+    __map__ = {}
+
+    def __init__(self, folder_path: str, file_extensions=True):
+        for dir_path, dir_names, f_names in os.walk(folder_path):
+            for f in f_names:
+                path = "/" + dir_path + "/" + f
+                path = "/".join(path.split(".")
+                                [:-1]) if not file_extensions else path
+                self.__map__[("GET"), path] = StaticSite(
+                    path, os.path.join(dir_path, f))
+        self.use()

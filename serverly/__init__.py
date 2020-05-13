@@ -48,7 +48,7 @@ import serverly.stater
 import serverly.statistics
 from fileloghelper import Logger
 from serverly import default_sites
-from serverly.objects import Request, Response
+from serverly.objects import Request, Response, StaticSite
 from serverly.utils import *
 
 description = "A really simple-to-use HTTP-server"
@@ -179,27 +179,6 @@ class Server:
 
 
 _server: Server = None
-
-
-class StaticSite:
-    def __init__(self, path: str, file_path: str):
-        check_relative_path(path)
-        self.file_path = check_relative_file_path(file_path)
-        if path[0] != "^":
-            path = "^" + path
-        if path[-1] != "$":
-            path += "$"
-        self.path = path
-
-    def get_content(self):
-        content = ""
-        if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
-            content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
-        else:
-            with open(self.file_path, "r") as f:
-                content = f.read()
-        type_ = mimetypes.guess_type(self.file_path)[0]
-        return Response(headers={"Content-type": type_}, body=content)
 
 
 def _verify_user(req: Request):
