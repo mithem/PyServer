@@ -88,7 +88,6 @@ def guess_response_headers(content):
     else:
         c_type = "text/plain"
         l = len(content)
-    print(c_type, l)
     return {"Content-Length": l, "Content-type": c_type}
 
 

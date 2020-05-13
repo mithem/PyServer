@@ -186,7 +186,7 @@ class StaticSite:
         check_relative_path(path)
         self.file_path = check_relative_file_path(file_path)
         if path[0] != "^":
-            path += "^"
+            path = "^" + path
         if path[-1] != "$":
             path += "$"
         self.path = path
@@ -289,8 +289,8 @@ class Sitemap:
         method = get_http_method_type(method)
         if issubclass(site.__class__, StaticSite):
             self.methods[method][site.path] = site
-            logger.debug(
-                f"Registered {method.upper()} static site for path '{site.path}'.")
+            logger.success(
+                f"Registered {method.upper()} static site for path '{site.path}'.", False)
         elif callable(site):
             check_relative_path(path)
             if path[0] != "^":
@@ -298,8 +298,8 @@ class Sitemap:
             if path[-1] != "$":
                 path = path + "$"
             self.methods[method][path] = site
-            logger.debug(
-                f"Registered {method.upper()} function '{site.__name__}' for path '{path}'.")
+            logger.success(
+                f"Registered {method.upper()} function '{site.__name__}' for path '{path}'.", False)
         else:
             raise TypeError("site argument not a subclass of 'Site'.")
 

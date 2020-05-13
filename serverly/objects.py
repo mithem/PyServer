@@ -161,3 +161,34 @@ class Response(CommunicationObject):
 class Redirect(Response):
     def __init__(self, path: str, code=303):
         super().__init__(code, {"Location": path})
+
+
+class Resource():
+    """An API resource specifying how an endpoint looks."""
+
+    def use(self):
+        """register endpoints specified in Resource attributes"""
+        import serverly
+        for k, v in self.__map__.items():
+            try:
+                subclass = issubclass(v, Resource)
+                v = v()
+            except TypeError:
+                subclass = issubclass(type(v), Resource)
+            if subclass:
+                v.path = (self.path + v.path).replace("//", "/")
+                v.use()
+            elif callable(v):
+                try:
+                    serverly.register_function(k[0], self.path + k[1], v)
+                except Exception as e:
+                    serverly.logger.handle_exception(e)
+            elif type(v) == serverly.StaticSite:
+                serverly._sitemap.register_site(k[0], v, self.path + k[1])
+            elif type(v) == str:
+                new_path = self.path + k[1]
+                s = serverly.StaticSite(new_path, v)
+                serverly._sitemap.register_site(k[0], s, self.path + k[1])
+        serverly.logger.context = "registration"
+        serverly.logger.success(
+            f"Registered Resource '{type(self).__name__}' for base path '{self.path}'.", False)
