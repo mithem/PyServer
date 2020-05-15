@@ -60,20 +60,13 @@ def guess_response_headers(content):
             c_type = "text/html"
         else:
             c_type = "text/plain"
-        l = len(bytes(content, "utf-8"))
     elif is_json_serializable(content):
         c_type = "application/json"
-        l = len(json.dumps(content))
     elif hasattr(content, "read"):
         c_type = mimetypes.guess_type(content.name)[0]
-        l = len(content.read())
-    elif type(content) == bytes:
-        c_type = "application/octet-stream"
-        l = len(content)
     else:
-        c_type = "text/plain"
-        l = len(content)
-    return {"Content-Length": l, "Content-type": c_type}
+        c_type = "application/octet-stream"
+    return {"Content-type": c_type}
 
 
 def clean_user_object(user_s, *allow):

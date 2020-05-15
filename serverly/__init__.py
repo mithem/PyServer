@@ -240,7 +240,7 @@ class Sitemap:
         self.superpath = superpath
         self.debug = debug
         self.methods = {
-            "get": {"^/verify/[\w0-9]+$": _verify_user, "^/reset-password/[\w0-9]+$": _reset_password_user_endpoint, "^/confirm/[\w0-9]+$": _confirm_user},
+            "get": {r"^/verify/[\w0-9]+$": _verify_user, r"^/reset-password/[\w0-9]+$": _reset_password_user_endpoint, r"^/confirm/[\w0-9]+$": _confirm_user},
             "post": {"^/api/resetpassword/?$": _reset_password_for_real},
             "put": {},
             "delete": {}
@@ -271,7 +271,8 @@ class Sitemap:
         logger.context = "registration"
         method = get_http_method_type(method)
         if issubclass(site.__class__, StaticSite):
-            self.methods[method][site.path] = site
+            p = site.path if not path else path
+            self.methods[method][p] = site
             logger.success(
                 f"Registered {method.upper()} static site for path '{site.path}'.", False)
         elif callable(site):

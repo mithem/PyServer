@@ -1,9 +1,11 @@
-import pytest
-import serverly
 import json
-import urllib.parse as parse
 import multiprocessing
+import urllib.parse as parse
+
+import pytest
 import requests
+import serverly
+import serverly.objects
 
 print("SERVERLY VERSION v" + serverly.version)
 address = "localhost", 8896
@@ -52,13 +54,11 @@ def test_sitemap():
 
 def test_request():
     content = "Hello, World!"
-    cl = len(content)
-    req = serverly.Request("GET", "/helloworld", {"Content-type": "text/plain",
-                                                  "Content-Length": cl}, content, ("localhost", 8080))
+    req = serverly.Request(
+        "GET", "/helloworld", {"Content-type": "text/plain"}, content, ("localhost", 8080))
     assert req.body == content
     assert req.obj == None
-    assert req.headers == {"Content-type": "text/plain",
-                           "Content-Length": cl}
+    assert req.headers == {"Content-type": "text/plain"}
     assert req.address == ("localhost", 8080)
     assert req.path == "/helloworld"
     assert req.method == "get"
@@ -71,8 +71,7 @@ def test_response():
     content = "<html><h1>Hello, World</h1></html>"
     res = serverly.Response(body=content)
 
-    assert res.headers == {"Content-type": "text/html",
-                           "Content-Length": len(content)}
+    assert res.headers == {"Content-type": "text/html"}
     assert res.body == content
     assert res.code == 200
     assert res.obj == None
@@ -129,22 +128,20 @@ def test_ranstr():
 
 def test_guess_response_headers():
     c1 = "<html lang='en_US'><h1>Hello World!</h1></html>"
-    h1 = {"Content-type": "text/html", "Content-Length": len(c1)}
+    h1 = {"Content-type": "text/html"}
     assert serverly.utils.guess_response_headers(c1) == h1
 
     c2 = "Hello there!"
-    h2 = {"Content-type": "text/plain", "Content-Length": len(c2)}
+    h2 = {"Content-type": "text/plain"}
     assert serverly.utils.guess_response_headers(c2) == h2
 
     c3 = {"hello": True}
-    h3 = {"Content-type": "application/json",
-          "Content-Length": len(json.dumps(c3))}
+    h3 = {"Content-type": "application/json"}
     assert serverly.utils.guess_response_headers(c3) == h3
 
     c4 = {"id": 1, "password": "totallyhashed",
           "salt": "totallyrandom", "username": "oh yeah!"}
-    h4 = {"Content-type": "application/json",
-          "Content-Length": len(json.dumps(c4))}
+    h4 = {"Content-type": "application/json"}
     assert serverly.utils.guess_response_headers(c4) == h4
 
 
@@ -193,5 +190,35 @@ def test_server():
     p.terminate()
 
 
-if __name__ == "__main__":
-    test_response_3()
+def test_resource():
+    class Test(serverly.objects.Resource):
+        @staticmethod
+        def a(request):
+            return serverly.Response(body="on a!")
+
+        def __init__(self):
+            super().__init__()
+            self.__path__ = "/test/serverly/"
+            self.__map__ = {
+                ("GET", "/a"): self.a,
+                ("GET", "/b"): lambda request: serverly.Response(body="on b!"),
+                ("GET", "/c"): serverly.objects.StaticSite("/c", "test_serverly.py")
+            }
+
+    Test().use()
+
+    assert serverly._sitemap.get_content(serverly.Request(
+        "GET", parse.urlparse("/test/serverly/a"), {}, "", ("localhost", 8091))).body == "on a!"
+    assert serverly._sitemap.get_content(serverly.Request(
+        "GET", parse.urlparse("/test/serverly/b"), {}, "", ("localhost", 8091))).body == "on b!"
+    assert serverly._sitemap.get_content(serverly.Request(
+        "GET", parse.urlparse("/test/serverly/c"), {}, "", ("localhost", 8091))).body.startswith("import ")
+
+
+def test_static_resource():
+    serverly.objects.StaticResource("serverly", "/folders/")
+
+    response = serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
+        "/folders/serverly/__init__.py"), {}, "", ("localhost", 8091)))
+
+    assert "class Sitemap" in response.body

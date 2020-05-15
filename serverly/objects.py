@@ -207,29 +207,32 @@ class Resource:
             except TypeError:
                 subclass = issubclass(type(v), Resource)
             if subclass:
-                v.path = (self.__path__ + v.path).replace("//", "/")
+                v.__path__ = (self.__path__ + v.__path__).replace("//", "/")
                 v.use()
             elif callable(v):
                 try:
-                    serverly.register_function(k[0], self.__path__ + k[1], v)
+                    serverly.register_function(
+                        k[0], (self.__path__ + k[1]).replace("//", "/"), v)
                 except Exception as e:
                     serverly.logger.handle_exception(e)
             elif type(v) == serverly.StaticSite:
-                serverly._sitemap.register_site(k[0], v, self.__path__ + k[1])
+                serverly._sitemap.register_site(
+                    k[0], v, self.__path__ + k[1][1:])
             elif type(v) == str:
                 new_path = self.__path__ + k[1]
                 s = serverly.StaticSite(new_path, v)
                 serverly._sitemap.register_site(k[0], s, self.__path__ + k[1])
         serverly.logger.context = "registration"
         serverly.logger.success(
-            f"Registered Resource '{type(self).__name__}' for base path '{self.path}'.", False)
+            f"Registered Resource '{type(self).__name__}' for base path '{self.__path__}'.", False)
 
 
 class StaticResource(Resource):
-    path = ""
+    __path__ = ""
     __map__ = {}
 
-    def __init__(self, folder_path: str, file_extensions=True):
+    def __init__(self, folder_path: str, endpoint_path: str, file_extensions=True):
+        self.__path__ = endpoint_path
         for dir_path, dir_names, f_names in os.walk(folder_path):
             for f in f_names:
                 path = "/" + dir_path + "/" + f
