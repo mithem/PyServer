@@ -224,15 +224,15 @@ def _serve_console_static_files(func):
     }
     for path in required_files.keys():
         os.makedirs("/".join(path[2:-1].split("/")[:-1]), exist_ok=True)
+    for path, content in required_files.items():
+        if serverly._sitemap.methods["get"].get(path, "no") == "no":
+            fpath = path[2:-1]
+            with open(fpath, "w+") as f:
+                f.write(content)
+            serverly.static_page(fpath, path)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        for path, content in required_files.items():
-            if serverly._sitemap.methods["get"].get(path, "no") == "no":
-                fpath = path[2:-1]
-                with open(fpath, "w+") as f:
-                    f.write(content)
-                serverly.static_page(fpath, path)
         return func(*args, **kwargs)
     return wrapper
 

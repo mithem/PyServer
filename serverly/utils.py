@@ -5,6 +5,7 @@ import string
 import copy
 import serverly
 import mimetypes
+import re
 
 
 def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
@@ -45,25 +46,6 @@ def check_relative_file_path(file_path: str):
             "file_path argument expected to be of type string.")
 
 
-def parse_response_info(info: dict, content_length=0):
-    response_code = 200
-    content_length = content_length
-    content_type = "text/plain"
-    overflow = {}
-    for key, value in info.items():
-        if key.lower() == "response_code" or key.lower() == "response code" or key.lower() == "code" or key.lower() == "response" or key.lower() == "responsecode":
-            response_code = value
-        elif key.lower() == "content-length" or key.lower() == "content_length" or key.lower() == "content length" or key.lower() == "length":
-            content_length = value
-        elif key.lower() == "content-type" or key.lower() == "content_type" or key.lower() == "content type" or key.lower() == "type":
-            content_type = value
-        else:
-            overflow[key] = value
-    info = {"Content-Length": content_length,
-            "Content-type": content_type, **overflow}
-    return response_code, info
-
-
 def guess_filetype_on_filename(filename):
     return mimetypes.guess_type(filename)
 
@@ -78,13 +60,16 @@ def guess_response_headers(content):
             c_type = "text/html"
         else:
             c_type = "text/plain"
-        l = len(content)
+        l = len(bytes(content, "utf-8"))
     elif is_json_serializable(content):
         c_type = "application/json"
         l = len(json.dumps(content))
     elif hasattr(content, "read"):
         c_type = mimetypes.guess_type(content.name)[0]
         l = len(content.read())
+    elif type(content) == bytes:
+        c_type = "application/octet-stream"
+        l = len(content)
     else:
         c_type = "text/plain"
         l = len(content)
@@ -109,3 +94,37 @@ def clean_user_object(user_s, *allow):
     if type(user_s) == list:
         return [clean(u) for u in user_s]
     return clean(user_s)
+
+
+def get_server_address(address):
+    """returns tupe[str, int], e.g. ('localhost', 8080)"""
+    hostname = ""
+    port = 0
+
+    def valid_hostname(name):
+        return bool(re.match(r"^[_a-zA-Z.-]+$", name))
+    if type(address) == str:
+        pattern = r"^(?P<hostname>[_a-zA-Z.-]+)((,|, |;|; )(?P<port>[0-9]{2,6}))?$"
+        match = re.match(pattern, address)
+        hostname, port = match.group("hostname"), int(match.group("port"))
+    elif type(address) == tuple:
+        if type(address[0]) == str:
+            if valid_hostname(address[0]):
+                hostname = address[0]
+        if type(address[1]) == int:
+            if address[1] > 0:
+                port = address[1]
+        elif type(address[0]) == int and type(address[1]) == str:
+            if valid_hostname(address[1]):
+                hostname = address[1]
+                if address[0] > 0:
+                    port = address[0]
+            else:
+                warnings.warn(UserWarning(
+                    "hostname and port are in the wrong order. Ideally, the addresses is a tuple[str, int]."))
+                raise Exception("hostname specified not valid")
+    else:
+        raise TypeError(
+            "address argument not of valid type. Expected type[str, int] (hostname, port)")
+
+    return (hostname, port)
