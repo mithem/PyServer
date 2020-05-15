@@ -104,7 +104,7 @@ def get_server_address(address):
     def valid_hostname(name):
         return bool(re.match(r"^[_a-zA-Z.-]+$", name))
     if type(address) == str:
-        pattern = r"^(?P<hostname>[_a-zA-Z.-]+)((,|, |;|; )(?P<port>[0-9]{2,6}))?$"
+        pattern = r"^(?P<hostname>[_a-zA-Z.-]+)((,|, |;|; |:|::|\||\|\|)(?P<port>[0-9]{2,6}))?$"
         match = re.match(pattern, address)
         hostname, port = match.group("hostname"), int(match.group("port"))
     elif type(address) == tuple:

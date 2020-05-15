@@ -21,12 +21,15 @@ except:
 
 def test_get_server_address():
     valid = ("localhost", 8080)
-    assert serverly.Server._get_server_address(
-        ("localhost", 8080)) == valid
-    assert serverly.Server._get_server_address("localhost,8080") == valid
-    assert serverly.Server._get_server_address("localhost, 8080") == valid
-    assert serverly.Server._get_server_address("localhost;8080") == valid
-    assert serverly.Server._get_server_address("localhost; 8080") == valid
+    assert serverly.utils.get_server_address(("localhost", 8080)) == valid
+    assert serverly.utils.get_server_address("localhost,8080") == valid
+    assert serverly.utils.get_server_address("localhost, 8080") == valid
+    assert serverly.utils.get_server_address("localhost;8080") == valid
+    assert serverly.utils.get_server_address("localhost; 8080") == valid
+    assert serverly.utils.get_server_address("localhost:8080") == valid
+    assert serverly.utils.get_server_address("localhost::8080") == valid
+    assert serverly.utils.get_server_address("localhost|8080") == valid
+    assert serverly.utils.get_server_address("localhost||8080") == valid
 
 
 def test_get_server_address_2():

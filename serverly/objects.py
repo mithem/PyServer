@@ -56,15 +56,16 @@ class CommunicationObject:
 
     @headers.setter
     def headers(self, headers: dict):
+        o = self.obj if self.obj else self.body
         try:
             self._headers = {
-                **guess_response_headers(self.body), **self.headers, **headers}
+                **guess_response_headers(o), **self.headers, **headers}
         except TypeError:
             h = {}
             for i in headers:
                 h[str(i[0], "utf-8")] = str(i[1], "utf-8")
             self._headers = {
-                **guess_response_headers(self.body), **self.headers, **h}
+                **guess_response_headers(o), **self.headers, **h}
 
     @property
     def body(self):
@@ -81,7 +82,6 @@ class CommunicationObject:
         def dictify(a):
             if type(a) == dict or type(a) == list:
                 try:
-                    self._headers = {"Content-type": "application/json"}
                     return jsonjson.dumps(a), a
                 except:
                     return listify(a), a

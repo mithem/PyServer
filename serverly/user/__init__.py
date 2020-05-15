@@ -262,9 +262,12 @@ def register(username: str, password: str, **kwargs):
 def authenticate(username: str, password: str, strict=False, verified=False):
     """Return True or False. If `strict`, raise `NotAuthorizedError`. If `verified`, the user also has to be verified (requires email)"""
     session = _Session()
-    req_user = session.query(User).filter_by(username=username).first()
-    result = compare_digest(req_user.password, algorithm(
-        bytes(req_user.salt * salting + str(password), "utf-8")).hexdigest())
+    req_user = get(username, strict)
+    try:
+        result = compare_digest(req_user.password, algorithm(
+            bytes(req_user.salt * salting + str(password), "utf-8")).hexdigest())
+    except:
+        return False
     if verified:
         result = result and req_user.verified
     if strict:

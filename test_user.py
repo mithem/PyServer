@@ -80,8 +80,7 @@ def test_register():
     assert len(user.get_all()) == 1
 
 
-@pytest.mark.skip
-def test_authenticate():  # TODO whats wrong with this?
+def test_authenticate():
     try:
         assert user.authenticate("temporary", "temporary")
         assert not user.authenticate("temporary", "notcorrect")
@@ -89,8 +88,10 @@ def test_authenticate():  # TODO whats wrong with this?
         assert user.authenticate("temporary", "temporary", True)
     except user.UserNotFoundError:
         pass  # if this test is run seperately, authenticate will not find the user
+    with pytest.raises(user.UserNotFoundError):
+        user.authenticate("definetelynotanamebyanymeans", "dontcare:)", True)
     with pytest.raises(user.NotAuthorizedError):
-        user.authenticate("temporary", "notcorrect")
+        user.authenticate("temporary", "notcorrect", True)
 
 
 def test_clean_user_object():
