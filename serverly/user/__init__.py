@@ -379,13 +379,10 @@ def change(username: str, new_username: str = None, password: str = None, **kwar
         to_delete = []
         for key, value in update_dict.items():
             k = str(key).replace("User.", "")
-            serverly.logger.debug(k, True)
             if value == None and k in important_attributes:
                 to_delete.append(key)
         for i in to_delete:
             del update_dict[i]
-        serverly.logger.debug(update_dict, True)
-
         session.query(User).update(update_dict)
         session.commit()
     except Exception as e:

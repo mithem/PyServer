@@ -56,9 +56,15 @@ class CommunicationObject:
 
     @headers.setter
     def headers(self, headers: dict):
-        o = self.obj if self.obj else self.body
-        self._headers = {
-            **guess_response_headers(o), **self.headers, **headers}
+        try:
+            self._headers = {
+                **guess_response_headers(self.body), **self.headers, **headers}
+        except TypeError:
+            h = {}
+            for i in headers:
+                h[str(i[0], "utf-8")] = str(i[1], "utf-8")
+            self._headers = {
+                **guess_response_headers(self.body), **self.headers, **h}
 
     @property
     def body(self):
@@ -75,6 +81,7 @@ class CommunicationObject:
         def dictify(a):
             if type(a) == dict or type(a) == list:
                 try:
+                    self._headers = {"Content-type": "application/json"}
                     return jsonjson.dumps(a), a
                 except:
                     return listify(a), a
@@ -90,7 +97,7 @@ class CommunicationObject:
             else:
                 c = a.read()
                 self._headers = {
-                    "Content-type": mimetypes.guess_type(a.name)[0], "Content-Length": len(c)}
+                    "Content-type": mimetypes.guess_type(a.name)[0]}
                 return c, a
         self._body, self._obj = dictify(body)
 
@@ -110,7 +117,7 @@ class Request(CommunicationObject):
         self.address = address
 
         self.authenticated = False
-        for key, value in headers.items():
+        for key, value in self.headers.items():
             if key.lower() == "authentication" or key.lower() == "authorization":
                 self.auth_type, user_cred = tuple(value.split(" "))
                 if self.auth_type.lower() == "basic":

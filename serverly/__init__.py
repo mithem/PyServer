@@ -34,6 +34,8 @@ def hello_world(data):
 ```
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """
+
+
 import importlib
 import multiprocessing
 import re
@@ -41,11 +43,11 @@ import time
 import urllib.parse as parse
 import warnings
 from functools import wraps
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Union
 
 import serverly.stater
 import serverly.statistics
+import uvicorn
 from fileloghelper import Logger
 from serverly import default_sites
 from serverly.objects import Request, Response, StaticSite
@@ -61,97 +63,98 @@ logger.header(True, True, description, fileloghelper_version=True,
 error_response_templates = {}
 
 
-class Handler(BaseHTTPRequestHandler):
+# class Handler(BaseHTTPRequestHandler):
 
-    def respond(self, response: Response):
-        self.send_response(response.code)
-        for key, value in response.headers.items():
-            self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(bytes(response.body, "utf-8"))
+#     def respond(self, response: Response):
+#         self.send_response(response.code)
+#         for key, value in response.headers.items():
+#             self.send_header(key, value)
+#         self.end_headers()
+#         self.wfile.write(bytes(response.body, "utf-8"))
 
-    def handle_request(self, method: str):
-        try:
-            parsed_url = parse.urlparse(self.path)
-            data_length = int(self.headers.get("Content-Length", 0))
-            received_data = str(self.rfile.read(data_length), "utf-8")
-            request = Request(method, parsed_url, dict(
-                self.headers), received_data, self.client_address)
-            t1 = time.perf_counter()
-            response = _sitemap.get_content(request)
-            t2 = time.perf_counter()
-            self.respond(response)
-            logger.context = name + ": " + method
-            logger.debug(str(response))
-            serverly.statistics.calculation_times.append(t2 - t1)
-        except Exception as e:
-            serverly.stater.error(logger)
-            logger.handle_exception(e)
-            raise e
+#     def handle_request(self, method: str):
+#         try:
+#             parsed_url = parse.urlparse(self.path)
+#             data_length = int(self.headers.get("Content-Length", 0))
+#             received_data = str(self.rfile.read(data_length), "utf-8")
+#             request = Request(method, parsed_url, dict(
+#                 self.headers), received_data, self.client_address)
+#             t1 = time.perf_counter()
+#             response = _sitemap.get_content(request)
+#             t2 = time.perf_counter()
+#             self.respond(response)
+#             logger.context = name + ": " + method
+#             logger.debug(str(response))
+#             serverly.statistics.calculation_times.append(t2 - t1)
+#         except Exception as e:
+#             serverly.stater.error(logger)
+#             logger.handle_exception(e)
+#             raise e
 
-    def do_GET(self):
-        self.handle_request("GET")
+#     def do_GET(self):
+#         self.handle_request("GET")
 
-    def do_POST(self):
-        self.handle_request("POST")
+#     def do_POST(self):
+#         self.handle_request("POST")
 
-    def do_PUT(self):
-        self.handle_request("PUT")
+#     def do_PUT(self):
+#         self.handle_request("PUT")
 
-    def do_DELETE(self):
-        self.handle_request("DELETE")
+#     def do_DELETE(self):
+#         self.handle_request("DELETE")
+async def _read_body(receive):
+    """
+    Read and return the entire body from an incoming ASGI message.
+    http://www.uvicorn.org/#http-scope
+    """
+    body = b''
+    more_body = True
+
+    while more_body:
+        message = await receive()
+        body += message.get('body', b'')
+        more_body = message.get('more_body', False)
+
+    return body.decode("utf-8")
+
+
+async def _uvicorn_server(scope, receive, send):
+    assert scope["type"] == "http"
+    full_url = scope["path"] + "?" + str(scope["query_string"], "utf-8")
+    request = Request(scope["method"], parse.urlparse(full_url),
+                      scope["headers"], await _read_body(receive), scope["client"])
+    t1 = time.perf_counter()
+    response: Response = _sitemap.get_content(request)
+    t2 = time.perf_counter()
+    headers = []
+    for k, v in response.headers.items():
+        if type(v) == str:
+            value = bytes(v, "utf-8")
+        elif type(v) == int:
+            value = bytes(str(v), "utf-8")
+        else:
+            value = v
+        headers.append([bytes(k, "utf-8"), value])
+    await send({
+        "type": "http.response.start",
+        "status": response.code,
+        "headers": headers
+    })
+    await send({
+        "type": "http.response.body",
+        "body": bytes(response.body, "utf-8")
+    })
+    serverly.statistics.calculation_times.append(t2 - t1)
 
 
 class Server:
-    def __init__(self, server_address, webaddress="/", name="serverly", description="A serverly instance."):
-        """
-        :param webaddress: the internet address this server is accessed by (optional). It will automatically be inserted where a URL is recognized to be one of this server.
-        :type webaddress: str
-        """
+    def __init__(self, server_address, name="serverly", description="A serverly instance."):
         self.name = name
         self.description = description
-        self.server_address = self._get_server_address(server_address)
-        self.webaddress = webaddress
+        self.server_address = get_server_address(server_address)
         self.cleanup_function = None
-        self._handler: BaseHTTPRequestHandler = Handler
-        self._server: HTTPServer = HTTPServer(
-            self.server_address, self._handler)
         logger.context = "startup"
         logger.success("Server initialized", False)
-
-    @staticmethod
-    def _get_server_address(address):
-        """returns tupe[str, int], e.g. ('localhost', 8080)"""
-        hostname = ""
-        port = 0
-
-        def valid_hostname(name):
-            return bool(re.match(r"^[_a-zA-Z.-]+$", name))
-        if type(address) == str:
-            pattern = r"^(?P<hostname>[_a-zA-Z.-]+)((,|, |;|; )(?P<port>[0-9]{2,6}))?$"
-            match = re.match(pattern, address)
-            hostname, port = match.group("hostname"), int(match.group("port"))
-        elif type(address) == tuple:
-            if type(address[0]) == str:
-                if valid_hostname(address[0]):
-                    hostname = address[0]
-            if type(address[1]) == int:
-                if address[1] > 0:
-                    port = address[1]
-            elif type(address[0]) == int and type(address[1]) == str:
-                if valid_hostname(address[1]):
-                    hostname = address[1]
-                    if address[0] > 0:
-                        port = address[0]
-                else:
-                    warnings.warn(UserWarning(
-                        "hostname and port are in the wrong order. Ideally, the addresses is a tuple[str, int]."))
-                    raise Exception("hostname specified not valid")
-        else:
-            raise TypeError(
-                "address argument not of valid type. Expected type[str, int] (hostname, port)")
-
-        return (hostname, port)
 
     def run(self):
         try:
@@ -162,7 +165,8 @@ class Server:
             logger.context = "startup"
             logger.success(
                 f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
-            self._server.serve_forever()
+            uvicorn.run("serverly:_uvicorn_server",
+                        host=address[0], port=address[1], log_level="info")
         except KeyboardInterrupt:
             logger.context = "shutdown"
             logger.debug("Shutting down server…", True)
