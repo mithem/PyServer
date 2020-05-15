@@ -38,6 +38,8 @@ class DBObject:
 
 
 class CommunicationObject:
+    """More abstract class unifying Request & Response"""
+
     def __init__(self, headers: dict = {}, body: Union[str, dict, list] = ""):
 
         self._headers = {}  # initially
@@ -107,7 +109,21 @@ class CommunicationObject:
 
 
 class Request(CommunicationObject):
-    """This is passed along to registered functions as a representation of what the client requested."""
+    """This is passed along to registered functions as a representation of what the client requested.
+
+    Attributes:
+
+    - headers: dict: Headers received by client
+    - body (get): String representation of requests content
+    - body (set): Anything. Will be tried to jsonify, or other things if appropriate.
+    - obj (get): Object representation of requests content. Might be None.
+    - method: str: HTTP-Method (GET/POST etc.)
+    - path: urllib.parse.ParseResult(tuple): Parsed data about the request path
+    - address: tuple: Client address (e.g. ('localhost', 12345))
+    - authenticated: bool: Is user authenticated (not authorized) by any means?
+    - auth_type: str/None: Type of authentication (Basic/Bearer)
+    - user_cred: tuple/str: Credentials of user authenticating with (e.g. ('root', 'password123') or 'somebearerstring')
+    """
 
     def __init__(self, method: str, path: urllib.parse.ParseResult, headers: dict, body: Union[str, dict], address: tuple):
         super().__init__(headers, body)
@@ -132,7 +148,6 @@ class Request(CommunicationObject):
                 self.authenticated = True
         if not self.authenticated:
             self._set_auth_none()
-        self.authorized = self.authenticated
 
     def _set_auth_none(self):
         self.auth_type = None
@@ -151,10 +166,11 @@ class Response(CommunicationObject):
 
     Attributes
     ---
-    - code: response code
+    - code: Response code
     - headers: dict of headers to respond to the client
-    - body: str representation of the _content_
-    - obj: object representation of the _content_. None if not available
+    - body (get): str representation of the content
+    - obj (get): Object representation of the content. Might be None.
+    - body (set): Pretty much anything. Can be list, dict, string, a subclass of DBObject (e.g. serverly.user.User)
     """
 
     def __init__(self, code: int = 200, headers: dict = {}, body: Union[str, dict, list] = ""):
@@ -166,11 +182,15 @@ class Response(CommunicationObject):
 
 
 class Redirect(Response):
+    """Behaves like a Response object. Return it to redirect client to path. If required, you can change the code from 303 - See other (GET only) to whatever you like (might not redirect of course)."""
+
     def __init__(self, path: str, code=303):
         super().__init__(code, {"Location": path})
 
 
 class StaticSite:
+    """A static using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't *really* have to mind)"""
+
     def __init__(self, path: str, file_path: str):
         check_relative_path(path)
         self.file_path = check_relative_file_path(file_path)
@@ -181,18 +201,31 @@ class StaticSite:
         self.path = path
 
     def get_content(self):
+        """get content from file. Used by serverly."""
         content = ""
         if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
             content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
         else:
             with open(self.file_path, "r") as f:
                 content = f.read()
-        type_ = mimetypes.guess_type(self.file_path)[0]
-        return Response(headers={"Content-type": type_}, body=content)
+                return Response(headers=guess_response_headers(f), body=content)
 
 
 class Resource:
-    """An API resource specifying how an endpoint looks."""  # TODO documentation
+    """An API resource specifying how an endpoint looks. You can tell it where to sit with `__path__` and define it's endpoints in `__map__`
+
+    Example for `__map__`:
+    ```
+    {
+        # always return a fixed response;
+        # could also be any function accepting a request and returning a response
+        ('GET', '/hello'): lambda request: Response(body='hello there!'),
+        ('POST', '/bye'): 'bye.html' # registers StaticSite with file path 'bye.html'
+        ('GET', '/css/main.css'): StaticSite(…)
+        'folders': AnotherResource # recursively!
+    }
+    ```
+    """
 
     __path__ = ""
     __map__ = {}
@@ -207,9 +240,13 @@ class Resource:
             except TypeError:
                 subclass = issubclass(type(v), Resource)
             if subclass:
-                v.__path__ = (self.__path__ + v.__path__).replace("//", "/")
+                v.__path__ = (self.__path__ + k +
+                              v.__path__).replace("//", "/")
                 v.use()
-            elif callable(v):
+                continue
+            assert type(
+                k) == tuple, "Expected __map__ key to a type tuple containing method and path."
+            if callable(v):
                 try:
                     serverly.register_function(
                         k[0], (self.__path__ + k[1]).replace("//", "/"), v)
@@ -228,6 +265,7 @@ class Resource:
 
 
 class StaticResource(Resource):
+    """A subclass of StaticResource that lets you serve entire folders as (GET) endpoints. Registers endpoints on init. `folder_path` is the folder on the local filesystem to expose, `endpoint_path` the base path of all files on the web. If `file_extensions`, register the endpoints with the file extensions of the files, otherwise just the filename (might conflict with multiple filenames but different extensions)"""
     __path__ = ""
     __map__ = {}
 

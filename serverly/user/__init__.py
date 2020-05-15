@@ -74,7 +74,7 @@ class BearerToken(Base, DBObject):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     expires = Column(DateTime)
-    # custom seperators (;) have to be used as the SQLAlchemy-backend doesn't support Arrays
+    # custom seperators (;) have to be used as the SQLAlchemy-backend doesn't support lists in every SQL flavor
     scope = Column(String)
     username = Column(String)
     value = Column(String, unique=True)

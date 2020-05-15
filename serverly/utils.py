@@ -28,11 +28,11 @@ def get_http_method_type(method: str):
     """Return lowercase http method name, if valid. Else, raise Exception."""
     supported_methods = ["get", "post", "put", "delete"  # , "head", "connect", "options", "trace", "patch"
                          ]
-    method = str(method.lower())
-    if not method in supported_methods:
+    m = str(method).lower()
+    if not m in supported_methods:
         raise Exception(
-            "Request method not supported. Supported are GET, POST, PUT & DELETE.")
-    return method
+            f"Request method '{method}' not supported. Supported are GET, POST, PUT & DELETE.")
+    return m
 
 
 def check_relative_file_path(file_path: str):
@@ -64,6 +64,8 @@ def guess_response_headers(content):
         c_type = "application/json"
     elif hasattr(content, "read"):
         c_type = mimetypes.guess_type(content.name)[0]
+        if c_type == None:
+            c_type = "text/plain"
     else:
         c_type = "application/octet-stream"
     return {"Content-type": c_type}
