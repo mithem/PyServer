@@ -1,11 +1,14 @@
+import copy
 import json
+import mimetypes
 import os
 import random
-import string
-import copy
-import serverly
-import mimetypes
 import re
+import string
+from typing import Union
+
+import serverly
+import serverly.objects
 
 
 def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_uppercase):
@@ -81,13 +84,11 @@ def clean_user_object(user_s, *allow):
             bad_attributes.pop(bad_attributes.index(i))
 
     def clean(u):
-        new = {}
-        for attr in dir(u):
-            if not callable(attr) and not attr.startswith("_") and not attr in bad_attributes:
-                new[attr] = getattr(u, attr)
-        return new
-    if type(user_s) == list:
-        return [clean(u) for u in user_s]
+        if type(u) != list:
+            return u.to_dict(bad_attributes)
+        else:
+            return [i.to_dict() for i in u]
+
     return clean(user_s)
 
 
@@ -123,3 +124,21 @@ def get_server_address(address):
             "address argument not of valid type. Expected type[str, int] (hostname, port)")
 
     return (hostname, port)
+
+
+def parse_scope_list(scope: str):
+    r = scope.split(";")
+    for i in r:
+        if i == "":
+            r.pop(r.index(i))
+    return r
+
+
+def get_scope_list(scope: Union[str, list]):
+    try:
+        if type(scope) == str:
+            scope = [scope]
+        return ";".join(scope)
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return ""

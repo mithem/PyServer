@@ -2,10 +2,12 @@ import hashlib
 
 import pytest
 import serverly
+import serverly.utils
 import serverly.user as user
 import sqlalchemy
 import os
 import warnings
+import datetime
 
 print("SERVERLY VERSION v" + serverly.version)
 
@@ -106,6 +108,24 @@ def test_clean_user_object():
     n = serverly.utils.clean_user_object(u)
     assert n == {"username": "helloworld",
                  "birth_year": 1970, "first_name": "Timmy", "email": None, "role": None}
+
+
+@pytest.mark.skipif("database_collision")
+def test_clean_user_object_2():
+    d = datetime.datetime.now() + datetime.timedelta(minutes=30)
+    i = d.isoformat()
+    t1 = serverly.user.get_new_token(
+        "temporary", "read", d)
+    t2 = serverly.user.get_new_token("temporary", "write", d)
+
+    n = serverly.utils.clean_user_object([t1, t2])
+
+    a = [{"username": "temporary", "expires": i,
+          "scope": "read", "value": t1.value, "id": 1}, {"username": "temporary", "expires": i, "scope": "write", "value": t2.value, "id": 2}
+         ]
+
+    for i in a:
+        assert i in n
 
 
 def test_parse_role_hierarchy():

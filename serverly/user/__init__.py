@@ -10,7 +10,7 @@ import sqlalchemy
 from serverly.objects import DBObject, Request, Response
 from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
                                UserNotFoundError, ConfigurationError)
-from serverly.utils import ranstr
+from serverly.utils import ranstr, parse_scope_list, get_scope_list
 from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
                         Interval, String)
 from sqlalchemy.ext.declarative import declarative_base
@@ -301,15 +301,19 @@ def get_by_email(email: str, strict=True):
 
 
 @_setup_required
-def get_by_token(bearer_token: str, strict=True, expired=True):
+def get_by_token(bearer_token: Union[str, BearerToken], strict=True, expired=True, scope: Union[str, list] = None):
     """Get user associated with `bearer_token`. If `strict`(default), raise UserNotFoundError if user does not exist. Else return None. If `expired` (default), treat user as unauthorized if token is expired."""
     session = _Session()
-    token: BearerToken = session.query(
-        BearerToken).filter_by(value=bearer_token).first()
+    if type(bearer_token) == str:
+        token: BearerToken = session.query(
+            BearerToken).filter_by(value=bearer_token).first()
+    else:
+        token: BearerToken = bearer_token
     if expired:
         if strict:
-            if not valid_token(bearer_token, expired):
-                raise UserNotFoundError("No user with token found.")
+            c = valid_token(bearer_token, expired, scope)
+            if not c:
+                raise NotAuthorizedError("Not authorized.")
     result: User = session.query(User).filter_by(
         username=token.username).first()
     session.close()
@@ -330,15 +334,27 @@ def get_by_id(identifier: int, strict=True):
 
 
 @_setup_required
-def valid_token(bearer_token: str, expired=True):
+def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Union[str, list] = None):
     """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
     session = _Session()
-    token: BearerToken = session.query(
-        BearerToken).filter_by(value=bearer_token).first()
+    if type(bearer_token) == str:
+        token: BearerToken = session.query(
+            BearerToken).filter_by(value=bearer_token).first()
+    else:
+        token: BearerToken = bearer_token
     if token.expires == None:
         expired = False
-    b = token.expires < datetime.datetime.now() if expired else True
-    return b and token != None
+    b = token.expires > datetime.datetime.now() if expired else True
+    if type(scope) == str:
+        scope = [scope]
+    scopes = parse_scope_list(token.scope)
+    c = True
+    try:
+        for s in scope:
+            assert s in scopes
+    except AssertionError:
+        c = False
+    return token != None and b and c
 
 
 def clear_expired_tokens():
@@ -354,6 +370,14 @@ def clear_expired_tokens():
             i += 1
     session.commit()
     return i
+
+
+def get_tokens_by_user(username: str):
+    """Return a list of all BearerToken objects corresponding to a user."""
+    session = _Session()
+    tokens = session.query(BearerToken).filter_by(username=username).all()
+    session.close()
+    return tokens
 
 
 @_setup_required
@@ -476,20 +500,27 @@ def delete_sessions(username: str):
 
 
 @_setup_required
-def get_new_token(username: str, scope="", expires: datetime.datetime = None):
+def get_new_token(username: str, scope: Union[str, list] = [], expires: Union[datetime.datetime, str] = None):
     """Generate a new token, save it for `username` and return it (obj)."""
-    session = _Session()
-    token = BearerToken()
-    token.username = str(username)
-    token.scope = str(scope)
-    token.expires = expires
-    # oh yeah! ~9.6x10^59 ages of the universe at 1 trillion guesses per second
-    token.value = serverly.utils.ranstr(50)
+    try:
+        if type(expires) == str:
+            expires = datetime.datetime.fromisoformat(expires)
 
-    session.add(token)
+        session = _Session()
+        token = BearerToken()
+        token.username = str(username)
+        token.scope = get_scope_list(scope)
+        token.expires = expires
+        # oh yeah! ~9.6x10^59 ages of the universe at 1 trillion guesses per second
+        token.value = serverly.utils.ranstr(50)
 
-    session.commit()
-    return token
+        session.add(token)
+
+        session.commit()
+        return token
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return None
 
 
 def basic_auth(func):
@@ -527,37 +558,30 @@ def basic_auth(func):
     return wrapper
 
 
-def bearer_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the(via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
-    @wraps(func)
-    def wrapper(request, *args, **kwargs):
-        try:
-            if request.auth_type.lower() == "bearer":
-                token = request.user_cred
-                if token == None or token == "":
-                    raise NotAuthorizedError("Not authenticated.")
-                request.user = get_by_token(token)
-            else:
-                # Don't wanna have too many exc
-                raise NotAuthorizedError(
-                    "Not authenticated properly.")
-            return func(request, *args, **kwargs)
-        except (AttributeError, NotAuthorizedError) as e:
-            s = {"e": str(e)}
-            if e.__class__ == AttributeError:
-                header = {"WWW-Authenticate": "Bearer"}
-            else:
-                header = {}
-                s = {**get(request.user_cred[0]).to_dict(), **s}
-            temp = string.Template(UNAUTHORIZED_TMPLT)
-            msg = temp.substitute(s)
-            return Response(401, header, msg)
-        except UserNotFoundError as e:
-            return Response(404, body="Invalid bearer token")
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'bearer_auth'-decorator. The specific error message is: {str(e)}")
-    return wrapper
+def bearer_auth(scope: Union[str, list], expired=True):
+    def my_wrap(func):
+        @wraps(func)
+        def wrapper(request, *args, **kwargs):
+            try:
+                if request.auth_type.lower() == "bearer":
+                    token = request.user_cred
+                    if token == None or token == "":
+                        raise NotAuthorizedError("Not authenticated.")
+                    request.user = get_by_token(token, True, expired, scope)
+                else:
+                    # Don't wanna have too many exc
+                    raise NotAuthorizedError(
+                        "Not authenticated properly.")
+                return func(request, *args, **kwargs)
+            except (AttributeError, NotAuthorizedError) as e:
+                return Response(401, body="Invalid bearer token.")
+            except UserNotFoundError as e:
+                return Response(401, body="Invalid bearer token.")
+            except Exception as e:
+                serverly.logger.handle_exception(e)
+                return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'bearer_auth'-decorator. The specific error message is: {str(e)}")
+        return wrapper
+    return my_wrap
 
 
 def session_auth(func):

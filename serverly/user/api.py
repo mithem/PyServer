@@ -2,6 +2,7 @@
 
 See the Postman documentation online: https://documenter.getpostman.com/view/10720102/Szf549XF?version=latest
 """
+import datetime
 import json
 import mimetypes
 import os
@@ -17,13 +18,16 @@ from serverly import error_response
 from serverly.objects import Redirect, Request, Response
 from serverly.user import basic_auth, bearer_auth, err, requires_role
 
-_RES_406 = Response(
-    406, body="Unable to parse required parameters. Expected username, password.")
 verify_mail = False
 only_user_verified = False
 use_sessions = False
 persistant_user_attributes = []
+bearer_allow_api_to_set_expired = False
+bearer_expires_after_minutes = 30
+
 _reversed_api = {}
+_RES_406 = Response(
+    406, body="Unable to parse required parameters. Expected username, password.")
 
 
 def use(function: str, method: str, path: str):
@@ -95,20 +99,25 @@ def use(function: str, method: str, path: str):
         _reversed_api[func.__name__] = path
 
 
-def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, fixed_user_attributes=[]):
-    """Use `mail_verification` to control whether the register function should automatically try to verify the users' email. You can also manually do that by calling `serverly.user.mail.send_verification_email()`.
+def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, fixed_user_attributes=[], bearer_tokens_allow_api_to_set_expired=False, bearer_tokens_expire_after_minutes=30):
+    """Some configuration of the standard API.
 
-    If `require_user_to_be_verified`, users will only authenticate if their email is verified.
-
-    If `use_sessions_when_client_calls_endpoint`, a new user activity will automatically be registered if the client uses an endpoint.
-
-    `fixed_user_attributes` is a list which contains the attribute names of User attributes which may not be changed by the API. Useful for roles and other attributes clients may not change (via API).
+    Variable |Description
+    - | - 
+    mail_verification | Send verification mail to user when calling the register API endpoint. You can do that manually by calling `serverly.user.mail.send_verification_email()`
+    require_user_to_be_verified | Users will only be authorized if their email is verified
+    use_sessions_when_client_calls_endpoint | Register a new user activity whenever an endpoint is called (`serverly.user.new_activity()`)
+    fixed_user_attributes | Attribute names of users which may not be changed via the API. Useful for roles or other important data the client may not change.
+    bearer_tokens_allow_api_to_set_expired | Allow the API to set the expire-date for bearer tokens. Otherwise `bearer_tokens_expire_after_minutes` will be used.
+    bearer_tokens_expire_after_minutes | Amount (int) of minutes after which BearerTokens expire by default (if not `bearer_tokens_allow_api_to_set_expired`)
     """
-    global verify_mail, only_user_verified, use_sessions, persistant_user_attributes
+    global verify_mail, only_user_verified, use_sessions, persistant_user_attributes, bearer_allow_api_to_set_expired, bearer_expires_after_minutes
     verify_mail = mail_verification
     only_user_verified = require_user_to_be_verified
     use_sessions = use_sessions_when_client_calls_endpoint
     persistant_user_attributes = fixed_user_attributes
+    bearer_allow_api_to_set_expired = bearer_tokens_allow_api_to_set_expired
+    bearer_expires_after_minutes = bearer_tokens_expire_after_minutes
 
 
 def _check_to_use_sessions(func):
@@ -204,10 +213,24 @@ def _api_bearer_authenticate(request: Request):
 @basic_auth
 @_check_to_use_sessions
 def _api_bearer_new(request: Request):
-    token = serverly.user.get_new_token(request.user.username, request.obj.get(
-        "scope", []), request.obj.get("expires"))
-    serverly.logger.context = "bearer"
-    return Response(body={"token": token.to_dict()})
+    try:
+        if bearer_allow_api_to_set_expired:
+            try:
+                e = request.obj.get("expires")
+            except:
+                e = datetime.datetime.now() + datetime.timedelta(minutes=bearer_expires_after_minutes)
+        else:
+            e = datetime.datetime.now() + datetime.timedelta(minutes=bearer_expires_after_minutes)
+        token = serverly.user.get_new_token(request.user.username, serverly.utils.get_scope_list(request.obj.get(
+            "scope", [])), e)
+    except AttributeError:
+        token = serverly.user.get_new_token(request.user.username, expires=e)
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(body=str(e))
+    token.scope = serverly.utils.parse_scope_list(token.scope)
+    d = token.to_dict()
+    return Response(body=d)
 
 
 @basic_auth

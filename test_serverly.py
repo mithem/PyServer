@@ -1,5 +1,7 @@
 import json
 import multiprocessing
+import os
+import time
 import urllib.parse as parse
 
 import pytest
@@ -8,9 +10,10 @@ import serverly
 import serverly.objects
 
 print("SERVERLY VERSION v" + serverly.version)
-address = "localhost", 8896
+address = ("localhost", 8896)
 domain = "http://" + address[0] + ":" + str(address[1])
 address_available = False
+database_collision = "serverly_users.db" in os.listdir()
 
 try:
     requests.get(domain)
@@ -98,6 +101,10 @@ def test_response_2():
     assert res.code == 200
     assert res.obj == d
 
+    j = json.loads(res.body)
+    for k, v in j.items():
+        assert d[k] == v
+
 
 def test_response_3():
     d = {"hello": True, "wow": 12}
@@ -145,8 +152,8 @@ def test_guess_response_headers():
     assert serverly.utils.guess_response_headers(c4) == h4
 
 
-@pytest.mark.skip
 @pytest.mark.skipif("not address_available")
+@pytest.mark.skipif("database_collision")
 def test_server():
     serverly.address = address
 
@@ -184,6 +191,8 @@ def test_server():
     p = multiprocessing.Process(target=serverly.start)
 
     p.start()
+
+    time.sleep(5)
 
     evaluate()
 

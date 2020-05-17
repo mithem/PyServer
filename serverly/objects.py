@@ -15,26 +15,34 @@ from serverly.utils import (get_http_method_type, guess_response_headers,
 class DBObject:
     """Subclass this to implement a `to_dict` method which is required by serverly to pass an object as a response body"""
 
-    def to_dict(self):
-        d = {}
-        for i in dir(self):
-            if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict":
-                a = getattr(self, i)
-                if type(a) == str and a[0] == "[":
+    def to_dict(self, forbidden=[]):
+        try:
+            d = {}
+            for i in dir(self):
+                if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict" and not i in forbidden:
+                    a = getattr(self, i)
                     try:
-                        a = jsonjson.loads(a)
+                        if type(a) == str and a[0] == "[":
+                            try:
+                                a = jsonjson.loads(a)
+                            except:
+                                pass
                     except:
                         pass
-                # json-serializable
-                if is_json_serializable(a):
-                    d[i] = a
-                elif issubclass(type(a), DBObject):
-                    d[i] = a.to_dict()
-                elif isinstance(a, datetime.datetime):
-                    d[i] = a.isoformat()
-                else:
-                    d[i] = str(a)
-        return d
+                    # json-serializable
+                    if is_json_serializable(a):
+                        d[i] = a
+                    elif issubclass(type(a), DBObject):
+                        d[i] = a.to_dict()
+                    elif isinstance(a, datetime.datetime):
+                        d[i] = a.isoformat()
+                    else:
+                        d[i] = str(a)
+            return d
+        except Exception as e:
+            import serverly
+            serverly.logger.handle_exception(e)
+            raise e
 
 
 class CommunicationObject:
@@ -75,18 +83,20 @@ class CommunicationObject:
 
     @body.setter
     def body(self, body: Union[str, dict, list, DBObject]):
+        import serverly
+
         def listify(a):
-            for i in a:
-                b = []
-                b.append(dictify(a))
-                return b
+            return [dictify(i) for i in a]
 
         def dictify(a):
-            if type(a) == dict or type(a) == list:
+            if type(a) == list:
                 try:
                     return jsonjson.dumps(a), a
                 except:
-                    return listify(a), a
+                    b = listify(a)
+                    return jsonjson.dumps(b), b
+            elif type(a) == dict:
+                return jsonjson.dumps(a), a
             elif type(a) == str:
                 try:
                     obj = jsonjson.loads(a)
