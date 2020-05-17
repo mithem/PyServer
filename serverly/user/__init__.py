@@ -203,7 +203,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
     _role_hierarchy = _parse_role_hierarchy(role_hierarchy)
 
     serverly.logger.debug(
-        f"serverly.user is now set up with the following configuration:\nalgorithm: {hash_algorithm.__name__}\nsalting: {bool(salting)}\nrequire email verification: {require_email_verification}\nrole hierarchy: {_role_hierarchy}", True)
+        f"serverly.user is now set up with the following configuration:\nalgorithm: {hash_algorithm.__name__}\nsalting: {bool(salting)}\nrequire email verification: {require_email_verification}\nrole hierarchy: {_role_hierarchy}")
 
 
 def _setup_required(func):
