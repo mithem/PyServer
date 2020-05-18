@@ -45,6 +45,7 @@ def use(function: str, method: str, path: str):
     - GET console.index: Basic (Entrypoint for serverly's admin console)
     - GET console.users: Basic (users overview)
     - GET console.users.change_or_register: Basic (Allows admins to change or register users on one page)
+    - GET console.endpoints: Basic (endpoints overview)
     - GET console.api.summary.users: Basic (API for getting a summary of all users)
     - GET console.api.summary.endpoints: Basic (API for getting a summary of all endpoints registered)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
@@ -55,6 +56,7 @@ def use(function: str, method: str, path: str):
     - DEL console.api.user.reset_password: Basic (send a password reset mail to users with ids submitted in request body)
     - DEL console.api.users.delete: Basic (delete users with ids submitted in request body)
     - POS console.api.renew_login: Basic (authenticate with admin credentials. If not successfull, sends back the WWW-Authenticate: Basic header)
+    - GET console.api.endpoints.get: Basic (get all endpoint details)
     - console.all (register all available console endpoints)
 
     `function` accepts on of the above. The API-endpoint will be registered for `method`on `path`.
@@ -76,6 +78,7 @@ def use(function: str, method: str, path: str):
         "console.index": _console_index,
         "console.users": _console_users,
         "console.users.change_or_register": _console_change_or_create_user,
+        "console.endpoints": _console_endpoints,
         "console.api.summary.users": _console_summary_users,
         "console.api.summary.endpoints": _console_summary_endpoints,
         "console.api.user.get": _console_api_get_user,
@@ -86,7 +89,8 @@ def use(function: str, method: str, path: str):
         "console.api.users.delete": _console_api_delete_users,
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
+        "console.api.endpoints.get": _console_api_endpoints_get,
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -334,6 +338,13 @@ def _console_change_or_create_user(request: Request):
 @basic_auth
 @_check_to_use_sessions
 @requires_role("admin")
+def _console_endpoints(request: Request):
+    return Response(body=_get_content(serverly.default_sites.console_endpoints))
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
 def _console_summary_users(request: Request):
     try:
         users = serverly.user.get_all()
@@ -381,6 +392,22 @@ def _console_summary_endpoints(request: Request):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(body=e)
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_api_endpoints_get(request: Request):
+    new = {}
+    for k, v in serverly._sitemap.methods.items():
+        new[k] = {}
+        for path, func in v.items():
+            if callable(func):
+                new[k][path] = func.__name__
+            else:
+                new[k][path] = type(func).__name__ + \
+                    " (" + func.file_path + ")"
+    return Response(body=new)
 
 
 @basic_auth

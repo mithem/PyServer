@@ -108,11 +108,6 @@ console_users = r"""<!DOCTYPE html>
     <title>serverly admin console</title>
     <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css">
     <style>
-      :root {
-        --table-border-color: #555555;
-        --table-cell-highlight-color: #eeeeee;
-        --table-cell-background-color: transparent;
-      }
       .topicContainer {
         background: white;
         box-shadow: 0px 0px 6px #cccccc;
@@ -147,11 +142,6 @@ console_users = r"""<!DOCTYPE html>
         background-color: var(--table-cell-highlight-color);
       }
       @media (prefers-color-scheme: dark) {
-        :root {
-          --table-border-color: #777777;
-          --table-cell-highlight-color: #555555;
-          --table-cell-background-color: transparent;
-        }
         .topicContainer {
           background-color: #3f3f3f;
           box-shadow: 0px 0px 6px #444444;
@@ -285,21 +275,6 @@ console_user_change_or_create = r"""<!DOCTYPE html>
     <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css" />
     <script src="SUPERPATH/console/static/js/main.js"></script>
     <style>
-      .card {
-        min-width: 400px;
-        width: 100%;
-        height: 600px;
-        margin: auto;
-        box-shadow: 0px 0px 10px #dddddd;
-        border: none;
-        border-radius: 12px;
-        background-color: white;
-      }
-      .card > span {
-        font-size: 26px;
-        font-weight: 600;
-        padding: 10px;
-      }
       #attributeContainer {
         display: grid;
         grid-template-columns: auto auto auto;
@@ -325,6 +300,15 @@ console_user_change_or_create = r"""<!DOCTYPE html>
         .card {
           background-color: #333333;
         }
+      }
+      .card {
+        min-width: 400px;
+        width: 100%;
+        height: 600px;
+      }
+      .card > span {
+        font-size: 26px;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -456,6 +440,117 @@ console_user_change_or_create = r"""<!DOCTYPE html>
 </html>
 """
 
+console_endpoints = r"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/console/static/css/main.css" />
+    <title>serverly admin console</title>
+    <script src="/console/static/js/main.js"></script>
+    <style>
+      body {
+        overflow-y: scroll;
+      }
+      .method-heading {
+        font-size: 22px;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+      .card {
+        width: 100%;
+        overflow-x: hidden;
+      }
+      table {
+        width: 100%;
+        margin: 5px;
+        text-align: left;
+        border-collapse: collapse;
+      }
+      table th {
+        font-weight: 500;
+        font-style: italic;
+      }
+      table tr:nth-child(even){
+        background-color: var(--table-cell-highlight-color);
+      }
+      @media screen and (max-width: 750px){
+        .card {
+          overflow-x: scroll;
+        }
+      }
+    </style>
+    <script>
+    function sortOnKeys(dict) {
+        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
+        var sorted = [];
+        for(var key in dict) {
+            sorted[sorted.length] = key;
+        }
+        sorted.sort();
+
+        var tempDict = {};
+        for(var i = 0; i < sorted.length; i++) {
+            tempDict[sorted[i]] = dict[sorted[i]];
+        }
+
+        return tempDict;
+      }
+      function drawEndpoints(endpoints) {
+        let endpointsContainer = document.getElementById("endpointsContainer");
+        endpointsContainer.innerHTML = "";
+        var result = "";
+        for (let method of Object.keys(endpoints)) {
+          result +=
+            "<div class='card'><span class='method-heading'>" +
+            method +
+            "</span>";
+          var table =
+            "<table><thead><th>path</th><th>function</th></thead><table;>";
+          for (let [path, funcname] of Object.entries(sortOnKeys(endpoints[method]))) {
+            path = path.slice(1, -1)
+            table +=
+              "<tr><td><a href='" +
+              path +
+              "' class='mylink'>" +
+              path +
+              "</a></td><td>" +
+              funcname +
+              "</td></tr>";
+          }
+          result += table + "</tbody></table></div>";
+        }
+        endpointsContainer.innerHTML = result;
+      }
+      function loadEndpoints() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status === 200) {
+              drawEndpoints(JSON.parse(req.responseText));
+            } else {
+              handleResponse(req);
+            }
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_api_endpoints_get");
+        req.send(null);
+      }
+    </script>
+  </head>
+  <body>
+    <nav>
+      <a href="SUPERPATH$_console_index">serverly admin console</a>
+    </nav>
+    <div id="endpointsContainer"></div>
+  </body>
+  <script>
+    loadEndpoints();
+  </script>
+</html>
+"""
+
 password_reset_page = r"""<!DOCTYPE html><html lang="en_US"><head><title>Reset password</title><script src="SUPERPATH/console/static/js/main.js"></script></head><body><script>var password = prompt("Your new password?");var req = new XMLHttpRequest();req.onreadystatechange= () => {if(req.readyState===4){handleResponse(req); if(req.status === 200){document.body.innerHTML = "<p>Password reset successful. You may now close this.</p>";}}}; req.open("POST", "SUPERPATH/api/resetpassword"); req.setRequestHeader("Authorization", "Bearer ${identifier}");req.send(JSON.stringify({password: password}));</script></body></html>"""
 
 console_js_main = r"""function handleResponse(res){
@@ -470,13 +565,15 @@ console_js_main = r"""function handleResponse(res){
 }"""
 
 console_css_main = """body {
-        flex-direction: column;
         background-color: #fafafa;
         overflow: hidden;
         font-family: "Poppins", "Sans-serif", "Times New Roman";
       }
       :root{
         --highlight-color: #23acf2;
+        --table-border-color: #555555;
+        --table-cell-highlight-color: #eeeeee;
+        --table-cell-background-color: transparent;
       }
       nav {
         background-color: #ffffff;
@@ -501,6 +598,16 @@ console_css_main = """body {
       nav a:hover {
         padding: 8px 18px;
         border: 2px solid var(--highlight-color);
+      }
+      .card {
+        margin: 10px auto auto auto;
+        box-shadow: 0px 0px 10px #dddddd;
+        border: none;
+        border-radius: 12px;
+        background-color: white;
+      }
+      .card > span {
+        padding: 10px;
       }
       .tableContainer {
         height: 500px;
@@ -533,6 +640,8 @@ console_css_main = """body {
         :root {
           --scrollbar-thumb-color: #555555;
           --scrollbar-track-color: #333333;
+          --table-border-color: #777777;
+          --table-cell-highlight-color: #555555;
         }
         * {
           color: white;
@@ -549,6 +658,10 @@ console_css_main = """body {
         }
         .mylink {
           color: white;
+        }
+        .card {
+          background-color: #333333;
+          box-shadow: 0px 0px 10px #444444;
         }
       }
   """
