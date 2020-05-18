@@ -45,7 +45,8 @@ def use(function: str, method: str, path: str):
     - GET console.index: Basic (Entrypoint for serverly's admin console)
     - GET console.users: Basic (users overview)
     - GET console.users.change_or_register: Basic (Allows admins to change or register users on one page)
-    - GET console.summary.users: Basic (API for getting a summary of all users)
+    - GET console.api.summary.users: Basic (API for getting a summary of all users)
+    - GET console.api.summary.endpoints: Basic (API for getting a summary of all endpoints registered)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
     - PUT console.api.user.change_or_register: Basic (API endpoint for changing or registering users)
     - POS console.api.users.verify: Basic (verify all users with ids submitted in request body)
@@ -76,6 +77,7 @@ def use(function: str, method: str, path: str):
         "console.users": _console_users,
         "console.users.change_or_register": _console_change_or_create_user,
         "console.api.summary.users": _console_summary_users,
+        "console.api.summary.endpoints": _console_summary_endpoints,
         "console.api.user.get": _console_api_get_user,
         "console.api.user.change_or_register": _console_api_change_or_create_user,
         "console.api.users.verify": _console_api_verify_users,
@@ -84,7 +86,7 @@ def use(function: str, method: str, path: str):
         "console.api.users.delete": _console_api_delete_users,
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -348,6 +350,37 @@ def _console_summary_users(request: Request):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(500, body=str(e))
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_summary_endpoints(request: Request):
+    try:
+        total = 0
+        methods = {}
+        for k, v in serverly._sitemap.methods.items():
+            c = len(v.keys())
+            methods[k] = c
+            total += c
+
+        s = f"There are {total} endpoints in total"
+        keys = list(methods.keys())
+        length = len(keys)
+        for k, v in methods.items():
+            if keys.index(k) == 0:
+                s += f", {v} of which are {k.upper()}"
+            elif keys.index(k) != length - 1:
+                s += f", {v} {k.upper()}"
+            else:
+                s += f" and {v} {k.upper()}"
+
+        s += " endpoints."
+
+        return Response(body=s)
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(body=e)
 
 
 @basic_auth
