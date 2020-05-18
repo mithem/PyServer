@@ -60,6 +60,22 @@ console_index = r"""<!DOCTYPE html>
         req.open("GET", "SUPERPATH$_console_summary_users");
         req.send(null);
       }
+      function updateEndpointSummary() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status !== 200) {
+              console.error("Server response for endpoint summary not ok:");
+              console.error(req);
+            }
+            document.querySelector(
+              ".summaries > .summary#summary-endpoints > p"
+            ).textContent = req.responseText;
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_summary_endpoints");
+        req.send(null);
+      }
     </script>
   </head>
   <body>
@@ -71,10 +87,15 @@ console_index = r"""<!DOCTYPE html>
         <a href="SUPERPATH$_console_users" class="mylink">users</a>
         <p>Loading...</p>
       </div>
+      <div class="summary" id="summary-endpoints">
+        <a href="SUPERPATH$_console_endpoints" class="mylink">endpoints</a>
+        <p>Loading...</p>
+      </div>
     </div>
   </body>
   <script>
     updateUserSummary();
+    updateEndpointSummary();
   </script>
 </html>
 """
