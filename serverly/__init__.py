@@ -303,9 +303,11 @@ class Sitemap:
             logger.context = "registration"
             logger.debug(
                 f"Unregistered site/function for path '{path}'")
+            return True
         else:
             logger.warning(
                 f"Site for path '{path}' not found. Cannot be unregistered.")
+            return False
 
     def get_func_or_site_response(self, site, request: Request):
         try:
@@ -414,10 +416,8 @@ def register_function(method: str, path: str, function):
 
 
 def unregister(method: str, path: str):
-    """Unregister any page (static or dynamic). Only affect the `method`-path (GET / POST)"""
-    check_relative_path(path)
-    method = get_http_method_type(method)
-    _sitemap.unregister_site(method, path)
+    """Unregister any page (static or dynamic). Return bool whether successful (found page)."""
+    return _sitemap.unregister_site(method, path)
 
 
 def _start_server(superpath: str, debug=False):

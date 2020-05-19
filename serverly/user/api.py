@@ -47,6 +47,7 @@ def use(function: str, method: str, path: str):
     - GET console.users.change_or_register: Basic (Allows admins to change or register users on one page)
     - GET console.endpoints: Basic (endpoints overview)
     - POS console.api.endpoint.new: Basic (register a new endpoint)
+    - DEL console.api.endpoint.del: Basic (delete existing endpoint identified by method & path)
     - GET console.api.summary.users: Basic (API for getting a summary of all users)
     - GET console.api.summary.endpoints: Basic (API for getting a summary of all endpoints registered)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
@@ -81,6 +82,7 @@ def use(function: str, method: str, path: str):
         "console.users.change_or_register": _console_change_or_create_user,
         "console.endpoints": _console_endpoints,
         "console.api.endpoint.new": _console_api_endpoint_new,
+        "console.api.endpoint.del": _console_api_endpoint_delete,
         "console.api.summary.users": _console_summary_users,
         "console.api.summary.endpoints": _console_summary_endpoints,
         "console.api.user.get": _console_api_get_user,
@@ -92,7 +94,7 @@ def use(function: str, method: str, path: str):
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
         "console.api.endpoints.get": _console_api_endpoints_get,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -435,7 +437,25 @@ def _console_api_endpoint_new(request: Request):
         return Response(404, body=f"Function '{new[0]}' not found.")
     except Exception as e:
         serverly.logger.handle_exception(e)
-        return Response(body=e)
+        return Response(body=str(e))
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_api_endpoint_delete(request: Request):
+    try:
+        success = serverly.unregister(
+            request.obj["method"], request.obj["path"])
+        if success:
+            return Response(body="Unregistered endpoint.")
+        else:
+            return Response(404, body="Endpoint not found.")
+    except (TypeError, KeyError):
+        return Response(406, body="Expected method & path.")
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(body=str(e))
 
 
 @basic_auth
