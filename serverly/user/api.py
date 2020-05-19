@@ -46,6 +46,7 @@ def use(function: str, method: str, path: str):
     - GET console.users: Basic (users overview)
     - GET console.users.change_or_register: Basic (Allows admins to change or register users on one page)
     - GET console.endpoints: Basic (endpoints overview)
+    - POS console.api.endpoint.new: Basic (register a new endpoint)
     - GET console.api.summary.users: Basic (API for getting a summary of all users)
     - GET console.api.summary.endpoints: Basic (API for getting a summary of all endpoints registered)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
@@ -79,6 +80,7 @@ def use(function: str, method: str, path: str):
         "console.users": _console_users,
         "console.users.change_or_register": _console_change_or_create_user,
         "console.endpoints": _console_endpoints,
+        "console.api.endpoint.new": _console_api_endpoint_new,
         "console.api.summary.users": _console_summary_users,
         "console.api.summary.endpoints": _console_summary_endpoints,
         "console.api.user.get": _console_api_get_user,
@@ -90,7 +92,7 @@ def use(function: str, method: str, path: str):
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
         "console.api.endpoints.get": _console_api_endpoints_get,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -408,6 +410,32 @@ def _console_api_endpoints_get(request: Request):
                 new[k][path] = type(func).__name__ + \
                     " (" + func.file_path + ")"
     return Response(body=new)
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_api_endpoint_new(request: Request):
+    try:
+        import __main__
+        s = str(request.obj["function"])
+        l = s.split(" ")
+        new = []
+        for i in l:
+            if i != "":
+                new.append(i)
+        if len(new) != 1:
+            return Response(406, body="Invalid function specified.")
+        serverly.register_function(
+            request.obj["method"], request.obj["path"], getattr(__main__, new[0]))
+        return Response(body=f"Registered function {new[0]} for path '{request.obj['path']}'.")
+    except (TypeError, KeyError):
+        return Response(406, body="Expected method, path & function.")
+    except AttributeError:
+        return Response(404, body=f"Function '{new[0]}' not found.")
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(body=e)
 
 
 @basic_auth
