@@ -435,6 +435,8 @@ def _console_api_endpoint_new(request: Request):
         return Response(406, body="Expected method, path & function.")
     except AttributeError:
         return Response(404, body=f"Function '{new[0]}' not found.")
+    except ValueError as e:
+        return Response(406, body=str(e))
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(body=str(e))
@@ -445,12 +447,21 @@ def _console_api_endpoint_new(request: Request):
 @requires_role("admin")
 def _console_api_endpoint_delete(request: Request):
     try:
-        success = serverly.unregister(
-            request.obj["method"], request.obj["path"])
-        if success:
-            return Response(body="Unregistered endpoint.")
-        else:
-            return Response(404, body="Endpoint not found.")
+        try:
+            if type(request.obj.get("method", [])) == str and type(request.obj.get("path", [])) == str:
+                endpoints = [(request.obj["method"], request.obj["path"])]
+        except AttributeError:
+            if type(request.obj) == list:
+                endpoints = []
+                for l in request.obj:
+                    endpoints.append(tuple(l))
+        c = 0
+        for method, path in endpoints:
+            if serverly.unregister(method, path):
+                c += 1
+        return Response(200, body=f"Unregistered {c} endpoints.")
+    except IndexError:
+        return Response(406, body="Missing data. Expected structure like this: [['get', '/hello'], ['post', '/new']]")
     except (TypeError, KeyError):
         return Response(406, body="Expected method & path.")
     except Exception as e:

@@ -243,7 +243,7 @@ console_users = r"""<!DOCTYPE html>
       <a href="/console">serverly admin console</a>
     </nav>
     <div class="topicContainer">
-      <span>Actions</span>
+      <span>actions</span>
       <div class="actions">
         <button class="action" id="change" onclick="change();">change/register</button>
         <button class="action" id="verify" onclick="verify();">verify</button>
@@ -254,7 +254,7 @@ console_users = r"""<!DOCTYPE html>
       </div>
     </div>
     <div class="topicContainer">
-      <span>Users</span>
+      <span>users</span>
       <div class="tableContainer">
         $user_table
       </div>
@@ -462,6 +462,13 @@ console_endpoints = r"""<!DOCTYPE html>
         width: 100%;
         overflow-x: hidden;
       }
+      .card > span {
+        font-size: 26px;
+        font-weight: 600;
+      }
+      .actions button {
+        margin: 10px;
+      }
       table {
         width: 100%;
         margin: 5px;
@@ -475,6 +482,10 @@ console_endpoints = r"""<!DOCTYPE html>
       table tr:nth-child(even){
         background-color: var(--table-cell-highlight-color);
       }
+      .tableContainer {
+        height: 500px;
+        overflow: scroll;
+      }
       @media screen and (max-width: 750px){
         .card {
           overflow-x: scroll;
@@ -482,7 +493,7 @@ console_endpoints = r"""<!DOCTYPE html>
       }
     </style>
     <script>
-    function sortOnKeys(dict) {
+      function sortOnKeys(dict) {
         // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
         var sorted = [];
         for(var key in dict) {
@@ -497,21 +508,64 @@ console_endpoints = r"""<!DOCTYPE html>
 
         return tempDict;
       }
+      function newEndpoint(){
+        let method = prompt("Method?");
+        let path = prompt("Path?");
+        let func = prompt("Function name (from your script)?");
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("POST", "SUPERPATH$_console_api_endpoint_new");
+        req.send(JSON.stringify({method: method, path: path, function: func}))
+      }
+      function deleteEndpoint(){
+        var endpoints = [];
+        for(let methodcard of document.querySelectorAll(".card")){
+          let method = methodcard.id.slice(5);
+          for(let endpoint of document.querySelectorAll("#card-" + method + " tr")){
+            var checked = endpoint.children[0].children[0].checked;
+            try {
+              var path = endpoint.children[1].children[0].textContent;
+              if (checked){
+                endpoints.push([method, path])
+              }
+            }
+            catch { // headers don't have enough children}
+            }
+          }
+        }
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_endpoint_delete");
+        req.send(JSON.stringify(endpoints));
+      }
+      function toggle(method){
+        method = method.toLowerCase();
+        let checkbox = document.querySelector("#card-" + method + " input.select-master");
+        let checked = checkbox.checked;
+        let endpoints = document.querySelectorAll("#card-" + method + " input.endpoint-select");
+        for(var endpoint of endpoints){
+          endpoint.checked = checked;
+        }
+      }
       function drawEndpoints(endpoints) {
         let endpointsContainer = document.getElementById("endpointsContainer");
         endpointsContainer.innerHTML = "";
         var result = "";
         for (let method of Object.keys(endpoints)) {
           result +=
-            "<div class='card'><span class='method-heading'>" +
+            "<div class='card' id='card-" + method + "'><span class='method-heading'>" +
             method +
             "</span>";
           var table =
-            "<table><thead><th>path</th><th>function</th></thead><table;>";
+            "<table><thead><th><input type='checkbox' class='endpoint-select select-master' onclick=\"toggle('" + method + "')\"></input></th><th>path</th><th>function</th></thead><tbody>";
           for (let [path, funcname] of Object.entries(sortOnKeys(endpoints[method]))) {
             path = path.slice(1, -1)
             table +=
-              "<tr><td><a href='" +
+              "<tr><td><input type='checkbox' class='endpoint-select' id='endpoint-" + path + "'></input></td><td><a href='" +
               path +
               "' class='mylink'>" +
               path +
@@ -543,6 +597,13 @@ console_endpoints = r"""<!DOCTYPE html>
     <nav>
       <a href="SUPERPATH$_console_index">serverly admin console</a>
     </nav>
+    <div class="card">
+      <span>actions</span>
+      <div class="actions">
+        <button onclick="newEndpoint()">new</button>
+        <button onclick="deleteEndpoint()">delete</button>
+      </div>
+    </div>
     <div id="endpointsContainer"></div>
   </body>
   <script>

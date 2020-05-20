@@ -33,7 +33,7 @@ def get_http_method_type(method: str):
                          ]
     m = str(method).lower()
     if not m in supported_methods:
-        raise Exception(
+        raise ValueError(
             f"Request method '{method}' not supported. Supported are GET, POST, PUT & DELETE.")
     return m
 
