@@ -63,45 +63,6 @@ logger.header(True, True, description, fileloghelper_version=True,
 error_response_templates = {}
 
 
-# class Handler(BaseHTTPRequestHandler):
-
-#     def respond(self, response: Response):
-#         self.send_response(response.code)
-#         for key, value in response.headers.items():
-#             self.send_header(key, value)
-#         self.end_headers()
-#         self.wfile.write(bytes(response.body, "utf-8"))
-
-#     def handle_request(self, method: str):
-#         try:
-#             parsed_url = parse.urlparse(self.path)
-#             data_length = int(self.headers.get("Content-Length", 0))
-#             received_data = str(self.rfile.read(data_length), "utf-8")
-#             request = Request(method, parsed_url, dict(
-#                 self.headers), received_data, self.client_address)
-#             t1 = time.perf_counter()
-#             response = _sitemap.get_content(request)
-#             t2 = time.perf_counter()
-#             self.respond(response)
-#             logger.context = name + ": " + method
-#             logger.debug(str(response))
-#             serverly.statistics.calculation_times.append(t2 - t1)
-#         except Exception as e:
-#             serverly.stater.error(logger)
-#             logger.handle_exception(e)
-#             raise e
-
-#     def do_GET(self):
-#         self.handle_request("GET")
-
-#     def do_POST(self):
-#         self.handle_request("POST")
-
-#     def do_PUT(self):
-#         self.handle_request("PUT")
-
-#     def do_DELETE(self):
-#         self.handle_request("DELETE")
 async def _read_body(receive):
     """
     Read and return the entire body from an incoming ASGI message.
@@ -298,9 +259,9 @@ class Sitemap:
         for key in self.methods[method].keys():
             if path == key:
                 found = True
+        logger.context = "registration"
         if found:
             del self.methods[method][key]
-            logger.context = "registration"
             logger.debug(
                 f"Unregistered site/function for path '{path}'")
             return True
