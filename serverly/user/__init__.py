@@ -314,7 +314,7 @@ def get_by_token(bearer_token: Union[str, BearerToken], strict=True, expired=Tru
         token: BearerToken = bearer_token
     if expired:
         if strict:
-            c = valid_token(bearer_token, expired, scope)
+            c = valid_token(token, expired, scope)
             if not c:
                 raise NotAuthorizedError("Not authorized.")
     result: User = session.query(User).filter_by(
@@ -352,11 +352,12 @@ def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Unio
         scope = [scope]
     scopes = parse_scope_list(token.scope)
     c = True
-    try:
-        for s in scope:
-            assert s in scopes
-    except AssertionError:
-        c = False
+    if scope != [""]:
+        try:
+            for s in scope:
+                assert s in scopes
+        except AssertionError:
+            c = False
     return token != None and b and c
 
 
@@ -566,16 +567,16 @@ def bearer_auth(scope: Union[str, list], expired=True):
         @wraps(func)
         def wrapper(request, *args, **kwargs):
             try:
+                if request.auth_type == None:
+                    return Response(401, {"WWW-Authenticate": "Bearer"})
                 if request.auth_type.lower() == "bearer":
                     token = request.user_cred
                     if token == None or token == "":
                         raise NotAuthorizedError("Not authenticated.")
                     request.user = get_by_token(token, True, expired, scope)
+                    return func(request, *args, **kwargs)
                 else:
-                    # Don't wanna have too many exc
-                    raise NotAuthorizedError(
-                        "Not authenticated properly.")
-                return func(request, *args, **kwargs)
+                    return Response(401, {"WWW-Authenticate": "Bearer"})
             except (AttributeError, NotAuthorizedError) as e:
                 return Response(401, body="Invalid bearer token.")
             except UserNotFoundError as e:
