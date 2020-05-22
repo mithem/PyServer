@@ -12,7 +12,8 @@ A really simple-to-use HTTP-server!
 - [Objects](#objects)
   - [Request](#requests)
   - [Response](#response)
-  - [Both](#both)
+  - [Request & Response](#request--response)
+  - [Resource](#resource)
 - [serverly.user](#serverlyuser)
 
 ## Configuration
@@ -93,16 +94,79 @@ Return Response registered by register_error_response (See above)
 | --------- | ----------------------------------- |
 | code: int | Response code to send to the client |
 
-### Both
+### Request & Response
 
-| Attribute                          | Description                                                                                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| headers: dict                      | Headers as a dict[str, Union[str, int]] recieved by the client or yet to return to it                                                            |
-| (set) body: Union[str, dict, list] | set `body` to a str, dict or list. Translating it into JSON, if necessary is handled automatically                                               |
-| (get) body: str                    | get the JSON representation of the request/response if available, otherwise just the string.                                                     |
-| (get) obj: object                  | get the object representation of the request/response. If there is none (body is a non-JSON string for example) it is set to None. NOT SET-able. |
+| Attribute                              | Description                                                                                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| headers: dict                          | Headers as a dict[str, Union[str, int]] recieved by the client or yet to return to it                                                                 |
+| (set) body: Union[str, dict, list, fb] | set `body` to a str, dict or list. Translating it into JSON, if necessary is handled automatically. Can be set to str, dict, list or file-like object |
+| (get) body: str                        | get the JSON representation of the request/response if available, otherwise just the string.                                                          |
+| (get) obj: object                      | get the object representation of the request/response. If there is none (body is a non-JSON string for example) it is set to None. NOT SET-able.      |
 
 Due to the properties above the probably best way to use requests/responses is by assigning values like dictionaries to the body attribute of responses and accessing the json of requests by using body (i.e. to store it in a database)
+
+### StaticSite
+
+`StaticSite(path: str, file_path: str)`
+A static site using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't \_really\* have to mind)
+
+### Resource
+
+You can subclass `serverly.objects.Resource` to specify your endpoints in an more OO-way.
+
+Example:
+
+```python
+class MyAPI(Resource):
+  @staticmethod
+  @basic_auth
+  def info(request: Request):
+    # do something and return a Response
+
+  def __init__(self):
+    self.__path__ = '/api/'
+    self.__map__ = {
+      '/overview/?': 'static/json/overview.json', # local filesystem
+      '/info/?': self.info,
+      '/products/': ProductsAPI
+    }
+```
+
+where `ProductsAPI` is another Resource subclass:
+
+```python
+class ProductsAPI(Resource):
+  @staticmethod
+  def get_all(request: Request):
+    # DB lookup and other stuff
+  def __init__(self):
+    self.__path__ = '/products/'
+    self.__map__ = {
+      '/getall': self.get_all,
+      '/new': self.new # ...
+    }
+```
+
+When you call `MyAPI().use()`, the following endpoints will be registered:
+
+| path                 | function                                |
+| -------------------- | --------------------------------------- |
+| /api/overview/?      |  StaticSite (static/json/overview.json) |
+| /info/?              | MyAPI().info                            |
+| /api/products/getall | ProductsAPI().get_all                   |
+| /api/products/new    | ProductsAPI().new                       |
+
+And yes, it's recursive!!!
+
+### StaticResource
+
+This allows you to serve an entire folder recursively with just one call:
+
+```python
+serverly.objects.StaticResource(folder_path: str, endpoint_path: str, file_extensions=True)
+```
+
+`file_extensions` specifies whether the endpoints should be include the file_extension of the original file (ex. /folder/hello.py)
 
 ## serverly.user
 

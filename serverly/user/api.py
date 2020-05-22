@@ -609,6 +609,8 @@ def _console_api_delete_users(request: Request):
 
 def _console_api_renew_login(request: Request):
     try:
+        if len(request.body) >= 1:
+            assert "hello" == "world", "oh yeah!"
         assert request.auth_type.lower() == "basic"
         user = serverly.user.get(request.user_cred[0])
         assert user.role == "admin"

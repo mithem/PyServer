@@ -83,8 +83,7 @@ class CommunicationObject:
 
     @body.setter
     def body(self, body: Union[str, dict, list, DBObject]):
-        import serverly
-
+        """str, dict, list, DBObject (or subclass) or file-like object"""
         def listify(a):
             return [dictify(i) for i in a]
 
@@ -199,7 +198,7 @@ class Redirect(Response):
 
 
 class StaticSite:
-    """A static using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't *really* have to mind)"""
+    """A static site using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't *really* have to mind)"""
 
     def __init__(self, path: str, file_path: str):
         check_relative_path(path)
@@ -250,8 +249,7 @@ class Resource:
             except TypeError:
                 subclass = issubclass(type(v), Resource)
             if subclass:
-                v.__path__ = (self.__path__ + k +
-                              v.__path__).replace("//", "/")
+                v.__path__ = (self.__path__ + k).replace("//", "/")
                 v.use()
                 continue
             assert type(
@@ -266,9 +264,9 @@ class Resource:
                 serverly._sitemap.register_site(
                     k[0], v, self.__path__ + k[1][1:])
             elif type(v) == str:
-                new_path = self.__path__ + k[1]
+                new_path = (self.__path__ + k[1]).replace("//", "/")
                 s = serverly.StaticSite(new_path, v)
-                serverly._sitemap.register_site(k[0], s, self.__path__ + k[1])
+                serverly._sitemap.register_site(k[0], s, new_path)
         serverly.logger.context = "registration"
         serverly.logger.success(
             f"Registered Resource '{type(self).__name__}' for base path '{self.__path__}'.", False)
@@ -286,6 +284,6 @@ class StaticResource(Resource):
                 path = "/" + dir_path + "/" + f
                 path = "/".join(path.split(".")
                                 [:-1]) if not file_extensions else path
-                self.__map__[("GET"), path] = StaticSite(
+                self.__map__[("GET", path)] = StaticSite(
                     path, os.path.join(dir_path, f))
         self.use()

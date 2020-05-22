@@ -44,6 +44,11 @@ console_index = r"""<!DOCTYPE html>
       }
     </style>
     <script>
+      function renewLogin(){
+        var req = new XMLHttpRequest();
+        req.open("POST", "SUPERPATH$_console_api_renew_login");
+        req.send('please send WWW-Authenticate header!');
+      }
       function updateUserSummary() {
         var req = new XMLHttpRequest();
         req.onreadystatechange = () => {
@@ -80,7 +85,7 @@ console_index = r"""<!DOCTYPE html>
   </head>
   <body>
     <nav>
-      <a href="SUPERPATH$_console_index">serverly admin console</a>
+      <a onclick="renewLogin()">serverly admin console</a>
     </nav>
     <div class="summaries">
       <div class="summary" id="summary-users">
@@ -618,12 +623,8 @@ console_js_main = r"""function handleResponse(res){
   if(res.readyState === 4){
     alert("[" + res.status + "] " + res.responseText);
   }
-  function renewLogin(){
-    var req = new XMLHttpRequest();
-    req.open("GET", "SUPERPATH$_console_api_renew_login");
-    req.send(null);
-  }
-}"""
+}
+"""
 
 console_css_main = """body {
         background-color: #fafafa;

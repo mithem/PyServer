@@ -55,6 +55,8 @@ This method is used to specify initial configuration options. It accepts the fol
 | verbose: bool                 | Verbose mode of the SQLite engine                                                                                                                              |
 | require_email_verification    |  Require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example. |
 
+<!-- TODO #31 complete parameters -->
+
 Supported types for `user_columns`' values are str, float, int, bytes, bool.
 
 Example:
@@ -371,4 +373,17 @@ Example:
 @user.requires_role('admin')
 def admin_status_page(req):
     return Response(body=f"Everything fine!")
+```
+
+You can set up a role hierarchy in setup()
+
+An example configuration looks like this:
+
+```python
+    {
+        'normal': 'normal', # required
+        'admin': 'normal',
+        'staff': 'normal'
+        'root': 'admin'
+    }
 ```
