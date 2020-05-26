@@ -259,9 +259,26 @@ serverly.user.mail.setup(
 
 ### Special mails
 
-You can specify special mail templates <!-- TODO #32 [DOCS] Complete MailManager.special_email configuration-->
+You can specify special mail templates in `serverly.user.mail._default_special_emails` or preferably by calling setup and passing `special_mails`. The default is the following:
 
-#### verification
+```python
+{
+    "verification": {
+        "subject": "Your recent registration",
+        "content": f"Hey $username,\nthank you for signing up for our service. Please click <a href='$verification'>this link</a> to verify your email.\n\nIf you cannot click the link for some reason, you can also just copy/paste it: \n$verification"
+    },
+    "confirmation": {
+        "subject": "Please verify your email",
+        "content": f"Hey $username,\nwe'd appreciate if you could verify your email by clicking <a href='$confirmation'>this link</a>, just in case!\n\nIf you cannot click the link for some reason, you can also just copy/paste it: \n$confirmation"
+    },
+    "password_reset": {
+        "subject": "You lost your password?",
+        "content": "Hi $username,\nit looks like you recently requested to change your password. You can use <a href='$password_reset'>this link</a> to reset it.\n\nTip: If you cannot the link above, try copy/pasting it in your browser: $password_reset\n\nAnother one: If you didn't request this, you can just delete this email."
+    }
+}
+```
+
+In each value (both subject and content), you can use placeholders which will be substituted with the users' attributes as well as other special strings. These are equal to the special email type (e.g. `verification`, `password_reset`) and are substituted by the unique url generated for the particular action.
 
 ### MailManager Methods
 
