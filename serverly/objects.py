@@ -273,7 +273,31 @@ class Resource:
 
 
 class StaticResource(Resource):
-    """A subclass of StaticResource that lets you serve entire folders as (GET) endpoints. Registers endpoints on init. `folder_path` is the folder on the local filesystem to expose, `endpoint_path` the base path of all files on the web. If `file_extensions`, register the endpoints with the file extensions of the files, otherwise just the filename (might conflict with multiple filenames but different extensions)"""
+    """A subclass of StaticResource that lets you serve entire folders as (GET) endpoints. Registers endpoints on init. `folder_path` is the folder on the local filesystem to expose, `endpoint_path` the base path of all files on the web. If `file_extensions`, register the endpoints with the file extensions of the files, otherwise just the filename (might conflict with multiple filenames but different extensions). 
+
+    Note: The folder name will be included in all paths.
+
+    Example:
+
+    Assuming the following folder structure
+    ```txt
+    - my_server_file.py
+    - hello
+      - hello.txt
+      - what
+        - dunno_what_to_name_this.txt
+    ```
+
+    , after calling `StaticResource('hello', '/myfolder/')`, the following (GET) endpoints will (hopefully) be registered:
+
+    - /myfolder/hello/hello.txt
+    - /myfolder/hello/what/dunno_what_to_name_this.txt
+
+    In case you set `file_extensions=False`, this will be served:
+
+    - /myfolder/hello/hello
+    - /myfolder/hello/what/dunno_what_to_name_this
+    """
     __path__ = ""
     __map__ = {}
 
@@ -285,5 +309,5 @@ class StaticResource(Resource):
                 path = "/".join(path.split(".")
                                 [:-1]) if not file_extensions else path
                 self.__map__[("GET", path)] = StaticSite(
-                    path, os.path.join(dir_path, f))
+                    (endpoint_path + "/" + path).replace("//", "/"), os.path.join(dir_path, f))
         self.use()
