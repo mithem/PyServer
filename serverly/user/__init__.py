@@ -563,6 +563,10 @@ def basic_auth(func):
 
 
 def bearer_auth(scope: Union[str, list], expired=True):
+    """This decorator allows you to specify that your function requires the user to have an specific scope (or higher of course). `scope` can be of type str or list<str>.
+
+    `expired`: bool specifies whether to handle expired tokens appropriately (-> not authorized).
+    """
     def my_wrap(func):
         @wraps(func)
         def wrapper(request, *args, **kwargs):

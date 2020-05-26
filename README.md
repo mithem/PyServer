@@ -108,7 +108,7 @@ Due to the properties above the probably best way to use requests/responses is b
 ### StaticSite
 
 `StaticSite(path: str, file_path: str)`
-A static site using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't \_really\* have to mind)
+A static site using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't _really_ have to mind)
 
 ### Resource
 

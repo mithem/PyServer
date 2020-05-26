@@ -324,14 +324,17 @@ Note: authorization decorators need to be placed 'under' / 'after' the serves-de
 ### bearer_auth()
 
 Authenticate via Bearer token. To map tokens to users and vice-versa, each user needs to have an attribute `bearer-token`. You can change it by just calling user.change(bearer_token=...) or using the standard API (bearer.new)
+You can specify that your function requires the user to have an specific scope (or higher of course). `scope` can be of type str or list\<str\>.
+
+`expired: bool` specifies whether to handle expired tokens appropriately (-> not authorized).
 
 Example:
 
 ```python
 @serves('GET', '/bearer')
-@user.bearer_auth
+@user.bearer_auth('admin')
 def my_page(req):
-    return Response(body=f'You authenticated as {req.user.username} with bearer token {req.user.bearer_token}!')
+    return Response(body=f"You authenticated as {req.user.username}! Also, you're an admin! 🎉")
 ```
 
 ### session_auth()
