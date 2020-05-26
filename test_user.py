@@ -110,15 +110,41 @@ def test_clean_user_object():
                  "birth_year": 1970, "first_name": "Timmy", "email": None, "role": None}
 
 
-@pytest.mark.skipif("database_collision")
 def test_clean_user_object_2():
+
+    bad_attributes = ["id", "password", "salt"]
+
+    def get_new():
+        u = user.User()
+        u.id = 0
+        u.password = serverly.utils.ranstr()
+        u.salt = serverly.utils.ranstr()
+        u.username = serverly.utils.ranstr()
+        u.birth_year = 1985
+        u.first_name = "Tom"
+        return u
+
+    l = []
+    for i in range(100):
+        l.append(get_new())
+
+    cleaned = serverly.utils.clean_user_object(l)
+
+    for u in cleaned:
+        for ba in bad_attributes:
+            with pytest.raises(AttributeError):
+                getattr(u, ba)
+
+
+@pytest.mark.skipif("database_collision")
+def test_clean_user_object_3():
     d = datetime.datetime.now() + datetime.timedelta(minutes=30)
     i = d.isoformat()
     t1 = serverly.user.get_new_token(
         "temporary", "read", d)
     t2 = serverly.user.get_new_token("temporary", "write", d)
 
-    n = serverly.utils.clean_user_object([t1, t2])
+    n = serverly.utils.clean_user_object([t1, t2], "id")
 
     a = [{"username": "temporary", "expires": i,
           "scope": "read", "value": t1.value, "id": 1}, {"username": "temporary", "expires": i, "scope": "write", "value": t2.value, "id": 2}
