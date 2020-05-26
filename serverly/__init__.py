@@ -126,7 +126,7 @@ class Server:
             logger.context = "startup"
             logger.success(
                 f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
-            uvicorn.run("serverly:_uvicorn_server",
+            uvicorn.run(_uvicorn_server,
                         host=address[0], port=address[1], log_level="info")
         except KeyboardInterrupt:
             logger.context = "shutdown"
