@@ -46,16 +46,15 @@ The standard user is already set up to have an `id`, `username`, `password` and 
 
 This method is used to specify initial configuration options. It accepts the following parameters:
 
-| Parameter                     | Description                                                                                                                                                    |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| hash_algorithm: callable      | Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str. Defaults to hashlib's sha3_512.      |
-| use_salting: bool             | Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure. Defaults to True.                                              |
-| filename: str                 |  Filename of the SQLite database                                                                                                                               |
-| user_columns: dict[str, type] |  Additional attributes of the user object. See example below. Defaults to an empty dict, meaning the user only has `id`, `username`, `password`, `salt`.       |
-| verbose: bool                 | Verbose mode of the SQLite engine                                                                                                                              |
-| require_email_verification    |  Require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example. |
-
-<!-- TODO #31 complete parameters -->
+| Parameter                     | Description                                                                                                                                                                                                                                    |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hash_algorithm: callable      | Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str. Defaults to hashlib's sha3_512.                                                                                      |
+| use_salting: bool             | Specify whether to use salting to randomise the hashes of password. Makes it a bit more secure. Defaults to True.                                                                                                                              |
+| filename: str                 |  Filename of the SQLite database                                                                                                                                                                                                               |
+| user_columns: dict[str, type] |  Additional attributes of the user object. See example below. Defaults to an empty dict, meaning the user only has `id`, `username`, `password`, `salt`.                                                                                       |
+| verbose: bool                 | Verbose mode of the SQLite engine                                                                                                                                                                                                              |
+| require_email_verification    |  Require that the email of the user is verified when authenticating. Has no effect on the `authenticate`-method but on the `basic_auth`-decorator for example.                                                                                 |
+| role_hierarchy                |  A dictionary with roles as keys & values. If an endpoint requires a role the user does not have explicitly, the user will be authorized if his 'subroles' match de required one(s). See [role-based authorization](#role-based-authorization) |
 
 Supported types for `user_columns`' values are str, float, int, bytes, bool.
 
@@ -375,15 +374,17 @@ def admin_status_page(req):
     return Response(body=f"Everything fine!")
 ```
 
-You can set up a role hierarchy in setup()
+You can set up a role hierarchy in setup() with a dictionary with roles as keys & values. If an endpoint requires a role the user does not have explicitly, the user will be authorized if his 'subroles' match de required one(s).
 
-An example configuration looks like this:
+Example for the `role_hierarchy`-parameter:
 
 ```python
-    {
-        'normal': 'normal', # required
-        'admin': 'normal',
-        'staff': 'normal'
-        'root': 'admin'
-    }
+{
+    'normal': 'normal', # required
+    'admin': 'normal',
+    'staff': 'normal'
+    'root': 'admin'
+}
 ```
+
+Then, admins & staff have the same rights as normals, root has the same as admin & staff (and therefore normals).
