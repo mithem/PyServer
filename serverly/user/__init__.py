@@ -1,3 +1,13 @@
+"""
+serverly.user
+--
+Configuration
+--
+Attribute | Description
+- | -
+session_renew_treshold = 60 | Number of seconds after which a new session will be created instead of increasing the end date (used by `serverly.user.session` and `serverly.user.auth`)
+
+"""
 import datetime
 import hashlib
 import string
@@ -8,19 +18,15 @@ from typing import Union
 import serverly
 import sqlalchemy
 from serverly.objects import DBObject, Request, Response
-from serverly.user.err import (NotAuthorizedError, UserAlreadyExistsError,
-                               UserNotFoundError, ConfigurationError)
-from serverly.utils import ranstr, parse_scope_list, get_scope_list
+from serverly.user.err import (ConfigurationError, NotAuthorizedError,
+                               UserAlreadyExistsError, UserNotFoundError)
+from serverly.utils import get_scope_list, parse_scope_list, ranstr
 from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
                         Interval, String)
 from sqlalchemy.ext.declarative import declarative_base
 
-# use these to customize the response of built-in authentication functions like the basic_auth()-decorator
-USER_NOT_FOUND_TMPLT = "User $e"
-UNAUTHORIZED_TMPLT = "Unauthorized."
-
-# number of seconds after which a new session will be created instead of increasing the end date
 session_renew_treshold = 60
+
 _required_user_attrs = []
 _role_hierarchy = {}
 _engine = None
@@ -89,38 +95,6 @@ def mockup_hash_algorithm(data: bytes):
         def hexdigest(self):
             return str(self.data, "utf-8")
     return HashOutput(data)
-
-
-# what even is this?? Works pretty well though (currently)!
-def _parse_role_hierarchy(hierarchy: dict):
-    def get_subroles(role: str):
-        def expand(s: set):
-            r = set()
-            if type(s) == str:
-                return [s]
-            for i in s:
-                if type(i) == set:
-                    r.add(expand(i))
-                else:
-                    r.add(i)
-            return r
-        roles = set()
-        for k, v in hierarchy.items():
-            if k == role:
-                if k == v:
-                    roles.add(v)
-                else:
-                    [roles.add(i) for i in expand(v)]
-                    [roles.add(i) for i in get_subroles(v)]
-                    if type(v) == set:
-                        for i in v:
-                            [roles.add(j) for j in get_subroles(i)]
-        return roles
-    hc = {}
-    for k in hierarchy:
-        hc[k] = get_subroles(k)
-
-    return hc
 
 
 def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False, role_hierarchy={}):
@@ -200,7 +174,7 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
         if getattr(User, attr, "definetely not a value") == "definetely not a value":
             raise ConfigurationError(f"User does not have attribute '{attr}'")
 
-    _role_hierarchy = _parse_role_hierarchy(role_hierarchy)
+    _role_hierarchy = serverly.utils.parse_role_hierarchy(role_hierarchy)
 
     serverly.logger.debug(
         f"serverly.user is now set up with the following configuration:\nalgorithm: {hash_algorithm.__name__}\nsalting: {bool(salting)}\nrequire email verification: {require_email_verification}\nrole hierarchy: {_role_hierarchy}")
@@ -314,7 +288,7 @@ def get_by_token(bearer_token: Union[str, BearerToken], strict=True, expired=Tru
         token: BearerToken = bearer_token
     if expired:
         if strict:
-            c = valid_token(token, expired, scope)
+            c = serverly.user.auth.valid_token(token, expired, scope)
             if not c:
                 raise NotAuthorizedError("Not authorized.")
     result: User = session.query(User).filter_by(
@@ -334,54 +308,6 @@ def get_by_id(identifier: int, strict=True):
     if result == None and strict:
         raise UserNotFoundError(f"User with id {id} not found.")
     return result
-
-
-@_setup_required
-def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Union[str, list] = None):
-    """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
-    session = _Session()
-    if type(bearer_token) == str:
-        token: BearerToken = session.query(
-            BearerToken).filter_by(value=bearer_token).first()
-    else:
-        token: BearerToken = bearer_token
-    if token.expires == None:
-        expired = False
-    b = token.expires > datetime.datetime.now() if expired else True
-    if type(scope) == str:
-        scope = [scope]
-    scopes = parse_scope_list(token.scope)
-    c = True
-    if scope != [""]:
-        try:
-            for s in scope:
-                assert s in scopes
-        except AssertionError:
-            c = False
-    return token != None and b and c
-
-
-def clear_expired_tokens():
-    """Delete (permanently) all BearerTokens which are expired and return how many where deleted."""
-    session = _Session()
-    tokens = session.query(BearerToken).filter_by(
-        BearerToken.expires.isnot(None))
-    n = datetime.datetime.now()
-    i = 0
-    for token in tokens:
-        if token.expires < n:
-            session.delete(token)
-            i += 1
-    session.commit()
-    return i
-
-
-def get_tokens_by_user(username: str):
-    """Return a list of all BearerToken objects corresponding to a user."""
-    session = _Session()
-    tokens = session.query(BearerToken).filter_by(username=username).all()
-    session.close()
-    return tokens
 
 
 @_setup_required
@@ -437,179 +363,6 @@ def delete_all():
     session.query(User).delete()
     session.commit()
     session.close()
-
-
-@_setup_required
-def get_all_sessions(username: str):
-    """Return all sessions for `username`. `username`= None -> Return all sessions of all users"""
-    session = _Session()
-    result = session.query(Session).filter_by(username=username).all() if type(
-        username) == str else session.query(Session).all()
-    session.close()
-    return result
-
-
-@_setup_required
-def get_last_session(username: str):
-    session = _Session()
-    result: Session = session.query(
-        Session).filter_by(username=username).order_by(sqlalchemy.desc(Session.id)).first()
-    session.close()
-    return result
-
-
-@_setup_required
-def extend_session(id, new_end: datetime.datetime):
-    session = _Session()
-    s: Session = session.query(Session).filter_by(id=id).first()
-    s.end = new_end
-    session.commit()
-    session.close()
-
-
-@_setup_required
-def new_activity(username: str, address: tuple):
-    """Update sessions to reflect a new user activity"""
-    def create_new():
-        session = _Session()
-        new = Session()
-        new.username = username
-        new.start = n
-        new.end = n + datetime.timedelta(seconds=10)
-        new.address = f"{address[0]}:{address[1]}"
-        session.add(new)
-        session.commit()
-    n = datetime.datetime.now()
-    last = get_last_session(username)
-    try:
-        if last.end + datetime.timedelta(seconds=session_renew_treshold) > n:
-            extend_session(last.id, n)
-        else:
-            create_new()
-    except AttributeError as e:
-        create_new()
-    except Exception as e:
-        serverly.logger.handle_exception(e)
-
-
-@_setup_required
-def delete_sessions(username: str):
-    """Delete all sessions of `username`. Set to None to delete all sessions. Non-revokable."""
-    session = _Session()
-    if username == None:
-        session.query(Session).delete()
-    else:  # is that necessary?
-        session.query(Session).filter_by(username=username).delete()
-    session.commit()
-
-
-@_setup_required
-def get_new_token(username: str, scope: Union[str, list] = [], expires: Union[datetime.datetime, str] = None):
-    """Generate a new token, save it for `username` and return it (obj)."""
-    try:
-        if type(expires) == str:
-            expires = datetime.datetime.fromisoformat(expires)
-
-        session = _Session()
-        token = BearerToken()
-        token.username = str(username)
-        token.scope = get_scope_list(scope)
-        token.expires = expires
-        # oh yeah! ~9.6x10^59 ages of the universe at 1 trillion guesses per second
-        token.value = serverly.utils.ranstr(50)
-
-        session.add(token)
-
-        session.commit()
-        return token
-    except Exception as e:
-        serverly.logger.handle_exception(e)
-        return None
-
-
-def basic_auth(func):
-    """Use this as a decorator to specify that serverly should automatically look for the (via 'Basic') authenticated user inside of the request object. You can then access the user with request.user. If the user is not authenticated, not found, or another exception occurs, your function WILL NOT BE CALLED."""
-    @wraps(func)
-    def wrapper(request: Request, *args, **kwargs):
-        global require_verified
-        try:
-            if request.auth_type.lower() == "basic":
-                request.user = get(request.user_cred[0])
-                authenticate(
-                    request.user_cred[0], request.user_cred[1], True, require_verified)
-            else:
-                # Don't wanna have too many exc
-                raise NotAuthorizedError("Not authenticated.")
-        except (AttributeError, NotAuthorizedError) as e:
-            s = {"e": str(e)}
-            if e.__class__ == AttributeError:
-                header = {"WWW-Authenticate": "Basic"}
-            else:
-                header = {}
-                s = {**get(request.user_cred[0]).to_dict(), **s}
-            temp = string.Template(UNAUTHORIZED_TMPLT)
-            msg = temp.safe_substitute(s)
-            return Response(401, header, msg)
-        except UserNotFoundError as e:
-            temp = string.Template(USER_NOT_FOUND_TMPLT)
-            msg = temp.safe_substitute(
-                e=str(e))
-            return Response(404, body=msg)
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'basic_auth'-decorator. The specific error message is: {str(e)}")
-        return func(request, *args, **kwargs)
-    return wrapper
-
-
-def bearer_auth(scope: Union[str, list], expired=True):
-    """This decorator allows you to specify that your function requires the user to have an specific scope (or higher of course). `scope` can be of type str or list<str>.
-
-    `expired`: bool specifies whether to handle expired tokens appropriately (-> not authorized).
-    """
-    def my_wrap(func):
-        @wraps(func)
-        def wrapper(request, *args, **kwargs):
-            try:
-                if request.auth_type == None:
-                    return Response(401, {"WWW-Authenticate": "Bearer"})
-                if request.auth_type.lower() == "bearer":
-                    token = request.user_cred
-                    if token == None or token == "":
-                        raise NotAuthorizedError("Not authenticated.")
-                    request.user = get_by_token(token, True, expired, scope)
-                    return func(request, *args, **kwargs)
-                else:
-                    return Response(401, {"WWW-Authenticate": "Bearer"})
-            except (AttributeError, NotAuthorizedError) as e:
-                return Response(401, body="Invalid bearer token.")
-            except UserNotFoundError as e:
-                return Response(401, body="Invalid bearer token.")
-            except Exception as e:
-                serverly.logger.handle_exception(e)
-                return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'bearer_auth'-decorator. The specific error message is: {str(e)}")
-        return wrapper
-    return my_wrap
-
-
-def session_auth(func):
-    """Use this decorator to authenticate the user by the latest session. Requires the use of `bearer_token`s(you don't need to use the decorator but user objects need to have the `bearer_token`- attribute)."""
-    @wraps(func)
-    @bearer_auth
-    def wrapper(request: Request, *args, **kwargs):
-        unauth_res = string.Template(
-            UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict())
-        try:
-            last_session = get_last_session(request.user.username)
-            if last_session.end + datetime.timedelta(seconds=session_renew_treshold) < datetime.datetime.now():
-                return Response(401, body=unauth_res)
-        except AttributeError:
-            return Response(401, {"WWW-Authenticate": "Bearer"}, unauth_res)
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            return Response(500, body=str(e))
-        return func(request, *args, **kwargs)
-    return wrapper
 
 
 @_requires_user_attr("role")
