@@ -16,7 +16,8 @@ import serverly.user.mail
 import serverly.utils
 from serverly import error_response
 from serverly.objects import Redirect, Request, Response
-from serverly.user import basic_auth, bearer_auth, err, requires_role
+from serverly.user import err, requires_role
+from serverly.user.auth import basic_auth, bearer_auth
 
 verify_mail = False
 only_user_verified = False
@@ -113,7 +114,7 @@ def setup(mail_verification=False, require_user_to_be_verified=False, use_sessio
     """Some configuration of the standard API.
 
     Variable |Description
-    - | - 
+    - | -
     mail_verification | Send verification mail to user when calling the register API endpoint. You can do that manually by calling `serverly.user.mail.send_verification_email()`
     require_user_to_be_verified | Users will only be authorized if their email is verified
     use_sessions_when_client_calls_endpoint | Register a new user activity whenever an endpoint is called (`serverly.user.new_activity()`)
@@ -134,7 +135,9 @@ def _check_to_use_sessions(func):
     @wraps(func)
     def wrapper(request, *args, **kwargs):
         if use_sessions:
-            serverly.user.new_activity(request.user.username, request.address)
+            import serverly.user.session
+            serverly.user.session.new_activity(
+                request.user.username, request.address)
         return func(request, *args, **kwargs)
     return wrapper
 

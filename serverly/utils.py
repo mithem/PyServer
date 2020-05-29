@@ -142,3 +142,34 @@ def get_scope_list(scope: Union[str, list]):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return ""
+
+
+def parse_role_hierarchy(hierarchy: dict):
+    def get_subroles(role: str):
+        def expand(s: set):
+            r = set()
+            if type(s) == str:
+                return [s]
+            for i in s:
+                if type(i) == set:
+                    r.add(expand(i))
+                else:
+                    r.add(i)
+            return r
+        roles = set()
+        for k, v in hierarchy.items():
+            if k == role:
+                if k == v:
+                    roles.add(v)
+                else:
+                    [roles.add(i) for i in expand(v)]
+                    [roles.add(i) for i in get_subroles(v)]
+                    if type(v) == set:
+                        for i in v:
+                            [roles.add(j) for j in get_subroles(i)]
+        return roles
+    hc = {}
+    for k in hierarchy:
+        hc[k] = get_subroles(k)
+
+    return hc

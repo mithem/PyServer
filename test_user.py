@@ -138,11 +138,12 @@ def test_clean_user_object_2():
 
 @pytest.mark.skipif("database_collision")
 def test_clean_user_object_3():
+    import serverly.user.auth
     d = datetime.datetime.now() + datetime.timedelta(minutes=30)
     i = d.isoformat()
-    t1 = serverly.user.get_new_token(
+    t1 = serverly.user.auth.get_new_token(
         "temporary", "read", d)
-    t2 = serverly.user.get_new_token("temporary", "write", d)
+    t2 = serverly.user.auth.get_new_token("temporary", "write", d)
 
     n = serverly.utils.clean_user_object([t1, t2], "id")
 
@@ -174,9 +175,9 @@ def test_parse_role_hierarchy():
         "god": "root"
     }
 
-    r1 = user._parse_role_hierarchy(e1)
-    r2 = user._parse_role_hierarchy(e2)
-    r3 = user._parse_role_hierarchy(e3)
+    r1 = serverly.utils.parse_role_hierarchy(e1)
+    r2 = serverly.utils.parse_role_hierarchy(e2)
+    r3 = serverly.utils.parse_role_hierarchy(e3)
 
     print(r3)
 
