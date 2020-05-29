@@ -180,11 +180,13 @@ class Response(CommunicationObject):
     - body (get): str representation of the content
     - obj (get): Object representation of the content. Might be None.
     - body (set): Pretty much anything. Can be list, dict, string, a subclass of DBObject (e.g. serverly.user.User)
+    - bandwidth: Maximum bandwidth used when sending to client (**in bytes**)
     """
 
-    def __init__(self, code: int = 200, headers: dict = {}, body: Union[str, dict, list] = ""):
+    def __init__(self, code: int = 200, headers: dict = {}, body: Union[str, dict, list] = "", bandwidth: int = None):
         super().__init__(headers, body)
         self.code = code
+        self.bandwidth = bandwidth
 
     def __str__(self):
         return f"Responding to request with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"

@@ -101,10 +101,13 @@ async def _uvicorn_server(scope, receive, send):
         "status": response.code,
         "headers": headers
     })
-    await send({
-        "type": "http.response.body",
-        "body": bytes(response.body, "utf-8")
-    })
+    if response.bandwidth == None:
+        await send({
+            "type": "http.response.body",
+            "body": bytes(response.body, "utf-8")
+        })
+    else:
+        chunks = serverly.utils.get_chunked_response(response)
     serverly.statistics.calculation_times.append(t2 - t1)
 
 

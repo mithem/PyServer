@@ -173,3 +173,11 @@ def parse_role_hierarchy(hierarchy: dict):
         hc[k] = get_subroles(k)
 
     return hc
+
+
+def get_chunked_response(response):
+    def chunks(lst, n):
+        """https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks"""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    return list(chunks(response.body, response.bandwidth))
