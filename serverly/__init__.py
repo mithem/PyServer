@@ -108,6 +108,18 @@ async def _uvicorn_server(scope, receive, send):
         })
     else:
         chunks = serverly.utils.get_chunked_response(response)
+        need_to_regulate = len(chunks) > 1
+        for chunk in chunks[:-1]:
+            await send({"type": "http.response.body",
+                        "body": bytes(chunk, "utf-8"),
+                        "more_body": True
+                        })
+            if need_to_regulate:
+                time.sleep(1)
+        await send({
+            "type": "http.response.body",
+            "body": bytes(chunks[-1], "utf-8")
+        })
     serverly.statistics.calculation_times.append(t2 - t1)
 
 
