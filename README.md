@@ -90,9 +90,10 @@ Return Response registered by register_error_response (See above)
 
 ### Response
 
-| Attribute | Description                         |
-| --------- | ----------------------------------- |
-| code: int | Response code to send to the client |
+| Attribute      | Description                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| code: int      | Response code to send to the client                                                        |
+| bandwidth: int | Maximum bandwidth used when sending to client (**bytes per sec**). None for no regulation. |
 
 ### Request & Response
 

@@ -180,7 +180,7 @@ class Response(CommunicationObject):
     - body (get): str representation of the content
     - obj (get): Object representation of the content. Might be None.
     - body (set): Pretty much anything. Can be list, dict, string, a subclass of DBObject (e.g. serverly.user.User)
-    - bandwidth: Maximum bandwidth used when sending to client (**in bytes**)
+    - bandwidth: Maximum bandwidth used when sending to client (**bytes per sec**). None for no regulation.
     """
 
     def __init__(self, code: int = 200, headers: dict = {}, body: Union[str, dict, list] = "", bandwidth: int = None):
