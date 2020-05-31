@@ -8,8 +8,10 @@ import urllib.parse
 import warnings
 from typing import Union
 
-from serverly.utils import (get_http_method_type, guess_response_headers,
-                            is_json_serializable, check_relative_path, check_relative_file_path)
+import serverly
+from serverly.utils import (check_relative_file_path, check_relative_path,
+                            get_http_method_type, guess_response_headers,
+                            is_json_serializable, lowercase_dict)
 
 
 class DBObject:
@@ -68,14 +70,14 @@ class CommunicationObject:
     def headers(self, headers: dict):
         o = self.obj if self.obj else self.body
         try:
-            self._headers = {
-                **guess_response_headers(o), **self.headers, **headers}
+            self._headers = lowercase_dict({
+                **guess_response_headers(o), **self.headers, **headers})
         except TypeError:
             h = {}
             for i in headers:
                 h[str(i[0], "utf-8")] = str(i[1], "utf-8")
-            self._headers = {
-                **guess_response_headers(o), **self.headers, **h}
+            self._headers = lowercase_dict({
+                **guess_response_headers(o), **self.headers, **h})
 
     @property
     def body(self):
@@ -84,32 +86,32 @@ class CommunicationObject:
     @body.setter
     def body(self, body: Union[str, dict, list, DBObject]):
         """str, dict, list, DBObject (or subclass) or file-like object"""
-        def listify(a):
-            return [dictify(i) for i in a]
-
         def dictify(a):
-            if type(a) == list:
-                try:
+            try:
+                if type(a) == list:
+                    try:
+                        return jsonjson.dumps(a), a
+                    except:
+                        b = [dictify(i) for i in a]
+                        return jsonjson.dumps(b), b
+                elif type(a) == dict:
                     return jsonjson.dumps(a), a
-                except:
-                    b = listify(a)
-                    return jsonjson.dumps(b), b
-            elif type(a) == dict:
-                return jsonjson.dumps(a), a
-            elif type(a) == str:
-                try:
-                    obj = jsonjson.loads(a)
-                except jsonjson.JSONDecodeError:
-                    obj = None
-                return a, obj
-            elif issubclass(a.__class__, DBObject):
-                d = a.to_dict()
-                return jsonjson.dumps(d), d
-            else:
-                c = a.read()
-                self._headers = {
-                    "Content-type": mimetypes.guess_type(a.name)[0]}
-                return c, a
+                elif type(a) == str:
+                    try:
+                        obj = jsonjson.loads(a)
+                    except jsonjson.JSONDecodeError:
+                        obj = None
+                    return a, obj
+                elif issubclass(a.__class__, DBObject):
+                    d = a.to_dict()
+                    return jsonjson.dumps(d), d
+                else:
+                    c = a.read()
+                    self._headers = {
+                        "Content-type": mimetypes.guess_type(a.name)[0]}
+                    return c, a
+            except Exception as e:
+                serverly.logger.handle_exception(e)
         self._body, self._obj = dictify(body)
 
     def __del__(self):
@@ -213,13 +215,23 @@ class StaticSite:
 
     def get_content(self):
         """get content from file. Used by serverly."""
+
+        binary_mimetypes = ["application/octet-stream", "video/mp4"]
+
         content = ""
         if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
             content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
         else:
-            with open(self.file_path, "r") as f:
-                content = f.read()
-                return Response(headers=guess_response_headers(f), body=content)
+            ftype = mimetypes.guess_type(self.file_path)
+            mode = "r"
+            if ftype[0] in binary_mimetypes:
+                mode = "rb"
+            try:
+                f = open(self.file_path, "r")
+                f.read()
+            except UnicodeDecodeError:
+                f = open(self.file_path, "rb")
+            return Response(headers=guess_response_headers(f), body=f)
 
 
 class Resource:

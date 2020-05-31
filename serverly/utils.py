@@ -6,6 +6,7 @@ import random
 import re
 import string
 from typing import Union
+import warnings
 
 import serverly
 import serverly.objects
@@ -116,8 +117,6 @@ def get_server_address(address):
                 if address[0] > 0:
                     port = address[0]
             else:
-                warnings.warn(UserWarning(
-                    "hostname and port are in the wrong order. Ideally, the addresses is a tuple[str, int]."))
                 raise Exception("hostname specified not valid")
     else:
         raise TypeError(
@@ -181,3 +180,21 @@ def get_chunked_response(response):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
     return list(chunks(response.body, response.bandwidth))
+
+
+def lowercase_dict(d: dict):
+    """convert all keys and values in d to lowercase (obviously str-only)"""
+    new = {}
+    for k, v in d.items():
+        new[k.lower()] = v.lower()
+    return new
+
+
+def get_bytes(o, mimetype: str):
+    if type(o) == str:
+        return bytes(o, "utf-8")
+    elif mimetype == "application/octet-stream":
+        return o
+    else:
+        # yeah i know could be simpler, shouldn't though (will probably 'soon' become more)
+        return o

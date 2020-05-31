@@ -80,47 +80,63 @@ async def _read_body(receive):
 
 
 async def _uvicorn_server(scope, receive, send):
-    assert scope["type"] == "http"
-    full_url = scope["path"] + "?" + str(scope["query_string"], "utf-8")
-    request = Request(scope["method"], parse.urlparse(full_url),
-                      scope["headers"], await _read_body(receive), scope["client"])
-    t1 = time.perf_counter()
-    response: Response = _sitemap.get_content(request)
-    t2 = time.perf_counter()
-    headers = []
-    for k, v in response.headers.items():
-        if type(v) == str:
-            value = bytes(v, "utf-8")
-        elif type(v) == int:
-            value = bytes(str(v), "utf-8")
+    try:
+        assert scope["type"] == "http"
+        full_url = scope["path"] + "?" + str(scope["query_string"], "utf-8")
+        request = Request(scope["method"], parse.urlparse(full_url),
+                          scope["headers"], await _read_body(receive), scope["client"])
+        t1 = time.perf_counter()
+        response: Response = _sitemap.get_content(request)
+        t2 = time.perf_counter()
+        headers = []
+        for k, v in response.headers.items():
+            if type(v) == str:
+                value = bytes(v, "utf-8")
+            elif type(v) == int:
+                value = bytes(str(v), "utf-8")
+            else:
+                value = v
+            headers.append([bytes(k, "utf-8"), value])
+        await send({
+            "type": "http.response.start",
+            "status": response.code,
+            "headers": headers
+        })
+        mimetype = response.headers.get("content-type", None)
+        if response.bandwidth == None:
+            await send({
+                "type": "http.response.body",
+                "body": serverly.utils.get_bytes(response.body, mimetype)
+            })
         else:
-            value = v
-        headers.append([bytes(k, "utf-8"), value])
-    await send({
-        "type": "http.response.start",
-        "status": response.code,
-        "headers": headers
-    })
-    if response.bandwidth == None:
+            chunks = serverly.utils.get_chunked_response(response)
+            need_to_regulate = len(chunks) > 1
+            for chunk in chunks[:-1]:
+                await send({"type": "http.response.body",
+                            "body": serverly.utils.get_bytes(chunk, mimetype),
+                            "more_body": True
+                            })
+                if need_to_regulate:
+                    time.sleep(1)
+            await send({
+                "type": "http.response.body",
+                "body": serverly.utils.get_bytes(chunks[-1], mimetype)
+            })
+        serverly.statistics.calculation_times.append(t2 - t1)
+    except Exception as e:
+        assert scope["type"] != "lifespan"
+        logger.handle_exception(e)
+        c = bytes(
+            "Sorry, but serverly made a mistake sending the response. Please inform the administrator.", "utf-8")
+        await send({
+            "type": "http.response.start",
+            "status": 500,
+            "headers": [["content-type", "text/html"], ["content-length", len(c)]]
+        })
         await send({
             "type": "http.response.body",
-            "body": bytes(response.body, "utf-8")
+            "body": c
         })
-    else:
-        chunks = serverly.utils.get_chunked_response(response)
-        need_to_regulate = len(chunks) > 1
-        for chunk in chunks[:-1]:
-            await send({"type": "http.response.body",
-                        "body": bytes(chunk, "utf-8"),
-                        "more_body": True
-                        })
-            if need_to_regulate:
-                time.sleep(1)
-        await send({
-            "type": "http.response.body",
-            "body": bytes(chunks[-1], "utf-8")
-        })
-    serverly.statistics.calculation_times.append(t2 - t1)
 
 
 class Server:
@@ -332,8 +348,11 @@ class Sitemap:
                 except:
                     pass
             response.headers = headers
-            response.body = response.body.replace(
-                "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+            try:
+                response.body = response.body.replace(
+                    "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
+            except:
+                pass
             return response
         except Exception as e:
             logger.handle_exception(e)
