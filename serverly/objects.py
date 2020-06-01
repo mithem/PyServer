@@ -204,7 +204,7 @@ class Redirect(Response):
 
 
 class StaticSite:
-    """A static site using `file_path` for it's data to serve. Will be registered for `path`, if not overriden later in the process (don't *really* have to mind)"""
+    """A static site using `file_path` for it's data to serve. Will be registered for `path` (if you register it), if not overriden in the process (don't *really* have to mind). Instead registering it manually, you can call `.use()`."""
 
     def __init__(self, path: str, file_path: str):
         check_relative_path(path)
