@@ -106,9 +106,11 @@ class CommunicationObject:
                     d = a.to_dict()
                     return jsonjson.dumps(d), d
                 else:
+                    # man this was about an hour to debug 😥. Great it works though!!!
+                    a.seek(0)
                     c = a.read()
-                    self._headers = {
-                        "Content-type": mimetypes.guess_type(a.name)[0]}
+                    self._headers["content-type"] = mimetypes.guess_type(a.name)[
+                        0]
                     return c, a
             except Exception as e:
                 serverly.logger.handle_exception(e)
@@ -215,23 +217,20 @@ class StaticSite:
 
     def get_content(self):
         """get content from file. Used by serverly."""
-
-        binary_mimetypes = ["application/octet-stream", "video/mp4"]
-
-        content = ""
         if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
-            content = "<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>"
+            return Response(500, body="<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>")
         else:
-            ftype = mimetypes.guess_type(self.file_path)
-            mode = "r"
-            if ftype[0] in binary_mimetypes:
-                mode = "rb"
             try:
                 f = open(self.file_path, "r")
+                f.seek(0)
                 f.read()
             except UnicodeDecodeError:
                 f = open(self.file_path, "rb")
-            return Response(headers=guess_response_headers(f), body=f)
+            return Response(body=f)
+
+    def use(self):
+        """register it, so you don't have to"""
+        serverly.register_function("GET", self.path, self)
 
 
 class Resource:
@@ -243,7 +242,8 @@ class Resource:
         # always return a fixed response;
         # could also be any function accepting a request and returning a response
         ('GET', '/hello'): lambda request: Response(body='hello there!'),
-        ('POST', '/bye'): 'bye.html' # registers StaticSite with file path 'bye.html'
+        # registers StaticSite with file path 'bye.html'
+        ('POST', '/bye'): 'bye.html'
         ('GET', '/css/main.css'): StaticSite(…)
         'folders': AnotherResource # recursively!
     }

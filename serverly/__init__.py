@@ -30,7 +30,7 @@ Example:
 ```
 @serves_get("/hello(world)?")
 def hello_world(data):
-    return {"response_code": 200, "Content-type": "text/plain"}, "Hello world!"
+    return {"response_code": 200, "c": "text/plain"}, "Hello world!"
 ```
 This will return "Hello World!" with a status code of 200, as plain text to the client
 """

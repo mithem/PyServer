@@ -72,7 +72,7 @@ def guess_response_headers(content):
             c_type = "text/plain"
     else:
         c_type = "application/octet-stream"
-    return {"Content-type": c_type}
+    return {"content-type": c_type}
 
 
 def clean_user_object(user_s, *allow):

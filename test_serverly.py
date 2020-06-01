@@ -58,10 +58,10 @@ def test_sitemap():
 def test_request():
     content = "Hello, World!"
     req = serverly.Request(
-        "GET", "/helloworld", {"Content-type": "text/plain"}, content, ("localhost", 8080))
+        "GET", "/helloworld", {"content-type": "text/plain"}, content, ("localhost", 8080))
     assert req.body == content
     assert req.obj == None
-    assert req.headers == {"Content-type": "text/plain"}
+    assert req.headers == {"content-type": "text/plain"}
     assert req.address == ("localhost", 8080)
     assert req.path == "/helloworld"
     assert req.method == "get"
@@ -74,7 +74,7 @@ def test_response():
     content = "<html><h1>Hello, World</h1></html>"
     res = serverly.Response(body=content)
 
-    assert res.headers == {"Content-type": "text/html"}
+    assert res.headers == {"content-type": "text/html"}
     assert res.body == content
     assert res.code == 200
     assert res.obj == None
@@ -96,7 +96,7 @@ def test_response_2():
         "salt": "totallyrandom"
     }
 
-    assert res.headers["Content-type"] == "application/json"
+    assert res.headers["content-type"] == "application/json"
 
     assert res.code == 200
     assert res.obj == d
@@ -124,6 +124,15 @@ def test_response_4():
     assert res.obj == d
 
 
+def test_response_5():
+    f = open("test_serverly.py", "r")
+    c = f.read()
+    r = serverly.Response(body=f)
+    assert r.obj.name == "test_serverly.py"
+    assert c.startswith("import ")
+    assert r.body == c
+
+
 def test_ranstr():
     s = []
     for _ in range(10000):
@@ -135,20 +144,20 @@ def test_ranstr():
 
 def test_guess_response_headers():
     c1 = "<html lang='en_US'><h1>Hello World!</h1></html>"
-    h1 = {"Content-type": "text/html"}
+    h1 = {"content-type": "text/html"}
     assert serverly.utils.guess_response_headers(c1) == h1
 
     c2 = "Hello there!"
-    h2 = {"Content-type": "text/plain"}
+    h2 = {"content-type": "text/plain"}
     assert serverly.utils.guess_response_headers(c2) == h2
 
     c3 = {"hello": True}
-    h3 = {"Content-type": "application/json"}
+    h3 = {"content-type": "application/json"}
     assert serverly.utils.guess_response_headers(c3) == h3
 
     c4 = {"id": 1, "password": "totallyhashed",
           "salt": "totallyrandom", "username": "oh yeah!"}
-    h4 = {"Content-type": "application/json"}
+    h4 = {"content-type": "application/json"}
     assert serverly.utils.guess_response_headers(c4) == h4
 
 
@@ -211,7 +220,8 @@ def test_resource():
             self.__map__ = {
                 ("GET", "/a"): self.a,
                 ("GET", "/b"): lambda request: serverly.Response(body="on b!"),
-                ("GET", "/c"): serverly.objects.StaticSite("/c", "test_serverly.py")
+                ("GET", "/c"): serverly.objects.StaticSite("/c", "setup.py"),
+                ("GET", "/d"): "test_serverly.py"
             }
 
     Test().use()
@@ -222,6 +232,8 @@ def test_resource():
         "GET", parse.urlparse("/test/serverly/b"), {}, "", ("localhost", 8091))).body == "on b!"
     assert serverly._sitemap.get_content(serverly.Request(
         "GET", parse.urlparse("/test/serverly/c"), {}, "", ("localhost", 8091))).body.startswith("import ")
+    assert serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
+        "/test/serverly/d"), {}, "", ("localhost", 8091))).body.startswith("import ")
 
 
 def test_static_resource():
