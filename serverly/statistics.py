@@ -11,13 +11,13 @@ def print_stats():
     a *= 1000  # milliseconds
     try:
         calc_times = {
-            "length": len(a),
+            "requests/responses": len(a),
             "avg": np.average(a),
             "max": np.max(a),
             "min": np.min(a),
             "median": np.median(a)
         }
-        print("\n\nCalculation times:\n")
+        print("\n\nCalculation times (ms):\n")
         print(tabulate([calc_times.values()], tuple(calc_times.keys())))
         with open("statistics.json", "w+") as f:
             json.dump(

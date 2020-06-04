@@ -56,7 +56,7 @@ from serverly.utils import *
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
-version = "0.4.3"
+version = "0.4.4"
 logger = Logger("serverly.log", "serverly", False, True)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
@@ -168,8 +168,24 @@ class Server:
             serverly.stater.set(0)
         except Exception as e:
             logger.handle_exception(e)
+        log_level = "info" if _sitemap.debug else "warning"
+        logger.debug("loglevel: " + log_level, True)
         uvicorn.run(_uvicorn_server,
-                    host=address[0], port=address[1], log_level="info", lifespan="on")
+                    host=address[0], port=address[1], log_level=log_level, lifespan="on")
+        self.close()
+
+    def close(self):
+        logger.context = "shutdown"
+        logger.debug("Shutting down server…", True)
+        try:
+            serverly.stater.set(3)
+        except Exception as e:
+            logger.handle_exception(e)
+        if callable(self.cleanup_function):
+            self.cleanup_function()
+        logger.success("Server stopped.")
+        serverly.statistics.print_stats()
+        exit(0)
 
 
 _server: Server = None
@@ -181,21 +197,8 @@ def _update_status(new_status: str):
         logger.context = "startup"
         logger.success(
             f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
-    elif new_status == "startup.failed":
-        exit(0)
-    elif new_status == "shutdown":
-        logger.context = "shutdown"
-        logger.debug("Shutting down server…", True)
-        try:
-            serverly.stater.set(3)
-        except Exception as e:
-            logger.handle_exception(e)
-        _server.shutdown()
-        _server.server_close()
-        if callable(_server.cleanup_function):
-            _server.cleanup_function()
-        logger.success("Server stopped.")
-        serverly.statistics.print_stats()
+    elif new_status == "startup.failed" or new_status == "shutdown":
+        _server.close()
     else:
         logger.warning(Exception(
             f"_update_status() was called with an invalid parameter 'new_status' of '{new_status}' (type {type(new_status)})"))
