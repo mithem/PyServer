@@ -80,63 +80,78 @@ async def _read_body(receive):
 
 
 async def _uvicorn_server(scope, receive, send):
-    try:
-        assert scope["type"] == "http"
-        full_url = scope["path"] + "?" + str(scope["query_string"], "utf-8")
-        request = Request(scope["method"], parse.urlparse(full_url),
-                          scope["headers"], await _read_body(receive), scope["client"])
-        t1 = time.perf_counter()
-        response: Response = _sitemap.get_content(request)
-        t2 = time.perf_counter()
-        headers = []
-        for k, v in response.headers.items():
-            if type(v) == str:
-                value = bytes(v, "utf-8")
-            elif type(v) == int:
-                value = bytes(str(v), "utf-8")
+    if scope["type"].startswith("lifespan"):
+        event = await receive()
+        s = event["type"].replace("lifespan.", "")
+        _update_status(s)
+    elif scope["type"] == "http":
+        try:
+            b = await _read_body(receive)
+            full_url = scope["path"] + "?" + \
+                str(scope["query_string"], "utf-8")
+            headers = {}
+            for hl in scope["headers"]:
+                if hl[0] != "authorization":
+                    v = str(hl[1], "utf-8")
+                else:
+                    v = hl[1]
+                headers[str(hl[0], "utf-8")] = v
+            request = Request(scope["method"], parse.urlparse(full_url),
+                              headers, b, scope["client"])
+            t1 = time.perf_counter()
+            response: Response = _sitemap.get_content(request)
+            t2 = time.perf_counter()
+            response_headers = []
+            for k, v in response.headers.items():
+                response_headers.append(
+                    [bytes(k, "utf-8"), serverly.utils.get_bytes(v)])
+            await send({
+                "type": "http.response.start",
+                "status": response.code,
+                "headers": response_headers
+            })
+            mimetype = response.headers.get("content-type", None)
+            if response.bandwidth == None:
+                await send({
+                    "type": "http.response.body",
+                    "body": serverly.utils.get_bytes(response.body, mimetype)
+                })
             else:
-                value = v
-            headers.append([bytes(k, "utf-8"), value])
-        await send({
-            "type": "http.response.start",
-            "status": response.code,
-            "headers": headers
-        })
-        mimetype = response.headers.get("content-type", None)
-        if response.bandwidth == None:
-            await send({
-                "type": "http.response.body",
-                "body": serverly.utils.get_bytes(response.body, mimetype)
-            })
-        else:
-            chunks = serverly.utils.get_chunked_response(response)
-            need_to_regulate = len(chunks) > 1
-            for chunk in chunks[:-1]:
-                await send({"type": "http.response.body",
-                            "body": serverly.utils.get_bytes(chunk, mimetype),
-                            "more_body": True
-                            })
-                if need_to_regulate:
-                    time.sleep(1)
-            await send({
-                "type": "http.response.body",
-                "body": serverly.utils.get_bytes(chunks[-1], mimetype)
-            })
-        serverly.statistics.calculation_times.append(t2 - t1)
-    except Exception as e:
-        assert scope["type"] != "lifespan"
-        logger.handle_exception(e)
-        c = bytes(
-            "Sorry, but serverly made a mistake sending the response. Please inform the administrator.", "utf-8")
-        await send({
-            "type": "http.response.start",
-            "status": 500,
-            "headers": [["content-type", "text/html"], ["content-length", len(c)]]
-        })
-        await send({
-            "type": "http.response.body",
-            "body": c
-        })
+                chunks = serverly.utils.get_chunked_response(response)
+                need_to_regulate = len(chunks) > 1
+                for chunk in chunks[:-1]:
+                    await send({"type": "http.response.body",
+                                "body": serverly.utils.get_bytes(chunk, mimetype),
+                                "more_body": True
+                                })
+                    if need_to_regulate:
+                        time.sleep(1)
+                await send({
+                    "type": "http.response.body",
+                    "body": serverly.utils.get_bytes(chunks[-1], mimetype)
+                })
+            serverly.statistics.calculation_times.append(t2 - t1)
+        except Exception as e:
+            logger.handle_exception(e)
+            if scope["type"] != "lifespan":
+                c = bytes(
+                    "Sorry, but serverly made a mistake sending the response. Please inform the administrator.", "utf-8")
+                await send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [[b"content-type", b"text/html"], [b"content-length", bytes(str(len(c)), "utf-8")]]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": c
+                })
+    else:
+        try:
+            raise NotImplementedError(
+                f"Unsupported ASGI type '{scope['type']}'.")
+        except Exception as e:
+            logger.context = "client connection"
+            logger.show_warning(e)
 
 
 class Server:
@@ -150,31 +165,40 @@ class Server:
 
     def run(self):
         try:
-            try:
-                serverly.stater.set(0)
-            except Exception as e:
-                logger.handle_exception(e)
-            logger.context = "startup"
-            logger.success(
-                f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
-            uvicorn.run(_uvicorn_server,
-                        host=address[0], port=address[1], log_level="info")
-        except KeyboardInterrupt:
-            logger.context = "shutdown"
-            logger.debug("Shutting down server…", True)
-            try:
-                serverly.stater.set(3)
-            except Exception as e:
-                logger.handle_exception(e)
-            self._server.shutdown()
-            self._server.server_close()
-            if callable(self.cleanup_function):
-                self.cleanup_function()
-            logger.success("Server stopped.")
-            serverly.statistics.print_stats()
+            serverly.stater.set(0)
+        except Exception as e:
+            logger.handle_exception(e)
+        uvicorn.run(_uvicorn_server,
+                    host=address[0], port=address[1], log_level="info", lifespan="on")
 
 
 _server: Server = None
+
+
+def _update_status(new_status: str):
+    """[internal] Update status of the server and act/log accordingly. Accepts status str as specified a ASGI lifespan."""
+    if new_status == "startup":
+        logger.context = "startup"
+        logger.success(
+            f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
+    elif new_status == "startup.failed":
+        exit(0)
+    elif new_status == "shutdown":
+        logger.context = "shutdown"
+        logger.debug("Shutting down server…", True)
+        try:
+            serverly.stater.set(3)
+        except Exception as e:
+            logger.handle_exception(e)
+        _server.shutdown()
+        _server.server_close()
+        if callable(_server.cleanup_function):
+            _server.cleanup_function()
+        logger.success("Server stopped.")
+        serverly.statistics.print_stats()
+    else:
+        logger.warning(Exception(
+            f"_update_status() was called with an invalid parameter 'new_status' of '{new_status}' (type {type(new_status)})"))
 
 
 def _verify_user(req: Request):

@@ -182,15 +182,21 @@ def get_chunked_response(response):
     return list(chunks(response.body, response.bandwidth))
 
 
-def lowercase_dict(d: dict):
-    """convert all keys and values in d to lowercase (obviously str-only)"""
+def lowercase_dict(d: dict, values=False):
+    """convert all keys and values (if values=True) in d to lowercase (obviously str-only)"""
     new = {}
     for k, v in d.items():
-        new[k.lower()] = v.lower()
+        if not values:
+            new[k.lower()] = v
+            continue
+        try:
+            new[k.lower()] = v.lower()
+        except:
+            new[k.lower()] = v
     return new
 
 
-def get_bytes(o, mimetype: str):
+def get_bytes(o, mimetype: str = None):
     if type(o) == str:
         return bytes(o, "utf-8")
     elif mimetype == "application/octet-stream":

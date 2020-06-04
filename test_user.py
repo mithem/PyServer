@@ -179,8 +179,6 @@ def test_parse_role_hierarchy():
     r2 = serverly.utils.parse_role_hierarchy(e2)
     r3 = serverly.utils.parse_role_hierarchy(e3)
 
-    print(r3)
-
     assert r1 == {"normal": {"normal"}, "admin": {"normal"}}
     assert r2 == {"normal": {"normal"}, "admin": {"normal"}, "staff": {
         "admin", "normal"}, "root": {"admin", "normal", "staff"}, "god": {"admin", "normal", "staff"}}

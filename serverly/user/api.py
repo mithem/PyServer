@@ -220,7 +220,6 @@ def _api_sessions_delete(req: Request):
 @bearer_auth("")
 @_check_to_use_sessions
 def _api_bearer_authenticate(request: Request):
-    print("in _api_bearer_authenticate()!")
     return Response()
 
 

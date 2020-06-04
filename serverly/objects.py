@@ -5,7 +5,6 @@ import json as jsonjson
 import mimetypes
 import os
 import urllib.parse
-import warnings
 from typing import Union
 
 import serverly
@@ -139,28 +138,40 @@ class Request(CommunicationObject):
     """
 
     def __init__(self, method: str, path: urllib.parse.ParseResult, headers: dict, body: Union[str, dict], address: tuple):
-        super().__init__(headers, body)
+        try:
+            super().__init__(headers, body)
 
-        self.method = get_http_method_type(method)
-        self.path = path
-        self.address = address
+            self.method = get_http_method_type(method)
+            self.path = path
+            self.address = address
 
-        self.authenticated = False
-        for key, value in self.headers.items():
-            if key.lower() == "authentication" or key.lower() == "authorization":
-                self.auth_type, user_cred = tuple(value.split(" "))
-                if self.auth_type.lower() == "basic":
-                    decoded = str(base64.b64decode(user_cred), "utf-8")
-                    self.user_cred = tuple(decoded.split(":"))
-                elif self.auth_type.lower() == "bearer":
-                    self.user_cred = user_cred
-                else:
-                    self.user_cred = None
-                    warnings.warn(
-                        "Requested auth method not supported. Expected Basic or Bearer.")
-                self.authenticated = True
-        if not self.authenticated:
-            self._set_auth_none()
+            self.authenticated = False
+            for key, value in self.headers.items():
+                if key.lower() == "authentication" or key.lower() == "authorization":
+                    auth = tuple(value.split(" "))
+                    self.auth_type = auth[0].lower()
+                    user_cred = auth[1]
+                    if self.auth_type.lower() == "basic":
+                        try:
+                            decoded = str(base64.b64decode(user_cred), "utf-8")
+                            self.user_cred = tuple(decoded.split(":"))
+                        except UnicodeDecodeError as e:
+                            serverly.logger.handle_exception(e)
+                            break
+                    elif self.auth_type.lower() == "bearer":
+                        self.user_cred = user_cred
+                    else:
+                        self.user_cred = None
+                        try:
+                            raise Warning(
+                                "Requested auth method not supported. Expected Basic or Bearer.")
+                        except Warning as e:
+                            serverly.logger.show_warning(e)
+                    self.authenticated = True
+            if not self.authenticated:
+                self._set_auth_none()
+        except Exception as e:
+            serverly.logger.handle_exception(e)
 
     def _set_auth_none(self):
         self.auth_type = None
