@@ -81,6 +81,7 @@ async def _read_body(receive):
 
 async def _uvicorn_server(scope, receive, send):
     t1 = time.perf_counter()
+    func = "some_error"
     if scope["type"].startswith("lifespan"):
         event = await receive()
         s = event["type"].replace("lifespan.", "")
@@ -170,7 +171,6 @@ class Server:
         except Exception as e:
             logger.handle_exception(e)
         log_level = "info" if _sitemap.debug else "warning"
-        logger.debug("loglevel: " + log_level, True)
         uvicorn.run(_uvicorn_server,
                     host=address[0], port=address[1], log_level=log_level, lifespan="on")
         self.close()
@@ -265,27 +265,6 @@ class Sitemap:
             "put": {},
             "delete": {}
         }
-        if error_page == None:
-            self.error_page = {
-                0: StaticSite(
-                    "/error", "none"),
-                404: default_sites.page_not_found_error,
-                500: default_sites.general_server_error,
-                942: default_sites.user_function_did_not_return_response_object
-            }
-        elif issubclass(error_page.__class__, StaticSite):
-            self.error_page = {0: error_page}
-        elif type(error_page) == dict:
-            for key, value in error_page.items():
-                if type(key) != int:
-                    raise TypeError(
-                        "error_page: dict keys not of type int (are used as response_codes)")
-                if not issubclass(error_page.__class__, StaticSite) and not callable(error_page):
-                    raise TypeError(
-                        "error_page is neither a StaticSite nor a function.")
-        else:
-            raise Exception(
-                "error_page argument expected to of type dict[int, Site], or a subclass of 'StaticSite'")
 
     def register_site(self, method: str, site: StaticSite, path=None):
         logger.context = "registration"
@@ -348,19 +327,10 @@ class Sitemap:
                         logger.handle_exception(e)
                         raise TypeError(
                             f"Function '{site.__name__}' either takes to many arguments (only object of type Request provided) or raises a TypeError")
-                    except Exception as e:
-                        serverly.logger.debug(
-                            "Site: " + site.__name__, self.debug)
-                        logger.handle_exception(e)
-                        content = Response(
-                            500, body=f"500 - Internal server error - {e}")
-                        raise e
                 except Exception as e:
                     serverly.logger.debug("Site: " + site.__name__, self.debug)
                     logger.handle_exception(e)
-                    content = Response(
-                        500, body=f"500 - Internal server error - {e}")
-                    raise e
+                    response = error_response(500)
                 if isinstance(content, Response):
                     response = content
                 else:
@@ -369,8 +339,7 @@ class Sitemap:
                             f"Function for '{request.path.path}' ({site.__name__}) needs to return a Response object. Website will be a warning message (not your content but serverly's).")
                     except Exception as e:
                         logger.handle_exception(e)
-                    response = self.get_func_or_site_response(
-                        self.error_page.get(942, self.error_page[0]), request)
+                    response = error_response(942)
             headers = response.headers
             for k, v in headers.items():
                 try:
@@ -392,20 +361,20 @@ class Sitemap:
     def get_content(self, request: Request):
         site = None
         response = None
+        func = "unknown_error"
         for pattern in self.methods[request.method].keys():
             if re.match(pattern, request.path.path):
                 site = self.methods[request.method][pattern]
                 break
         if site == None:
-            site = self.error_page.get(404, self.error_page[0])
-            response = self.get_func_or_site_response(
-                site, request)
+            response = error_response(404)
+            return (func, response)
         try:
             func, response = self.get_func_or_site_response(
                 site, request)
         except Exception as e:
             logger.handle_exception(e)
-            site = self.error_page.get(500, self.error_page[0])
+            site = error_response(500)
             response = self.get_func_or_site_response(
                 site, "")
             serverly.stater.error(logger)
@@ -524,3 +493,10 @@ def error_response(code: int, *args):
             f"No template found for code {str(code)}. Please make sure to register them by calling register_error_response.")
     except Exception as e:
         logger.handle_exception(e)
+
+
+register_error_response(
+    500, "500 - Internal server error - Sorry, something went wrong on our side.", "base")
+register_error_response(404, "<html><p>404 - Page not found</p></html>")
+register_error_response(
+    942, "<html><h3>502 - Bad Gateway.</h3><br />Sorry, there is an error with the function serving this site. Please advise the server administrator that the function for '{req.path.path}' is not returning a response object.</html>", "base")

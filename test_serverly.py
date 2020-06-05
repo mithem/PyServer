@@ -51,8 +51,8 @@ def test_sitemap():
     r1 = serverly.Request("GET", parse.urlparse("/"), {}, "", (0, 0))
     r2 = serverly.Request(
         "GET", parse.urlparse("/notavalidurlactuallyitisvalid"), {}, "", (0, 0))
-    assert serverly._sitemap.get_content(r1).body == "hello world!"
-    assert "404 - Page not found" in serverly._sitemap.get_content(r2).body
+    assert serverly._sitemap.get_content(r1)[1].body == "hello world!"
+    assert "404 - Page not found" in serverly._sitemap.get_content(r2)[1].body
 
 
 def test_request():
@@ -227,19 +227,19 @@ def test_resource():
     Test().use()
 
     assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/a"), {}, "", ("localhost", 8091))).body == "on a!"
+        "GET", parse.urlparse("/test/serverly/a"), {}, "", ("localhost", 8091)))[1].body == "on a!"
     assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/b"), {}, "", ("localhost", 8091))).body == "on b!"
+        "GET", parse.urlparse("/test/serverly/b"), {}, "", ("localhost", 8091)))[1].body == "on b!"
     assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/c"), {}, "", ("localhost", 8091))).body.startswith("import ")
+        "GET", parse.urlparse("/test/serverly/c"), {}, "", ("localhost", 8091)))[1].body.startswith("import ")
     assert serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
-        "/test/serverly/d"), {}, "", ("localhost", 8091))).body.startswith("import ")
+        "/test/serverly/d"), {}, "", ("localhost", 8091)))[1].body.startswith("import ")
 
 
 def test_static_resource():
     serverly.objects.StaticResource("serverly", "/folders/")
 
     response = serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
-        "/folders/serverly/__init__.py"), {}, "", ("localhost", 8091)))
+        "/folders/serverly/__init__.py"), {}, "", ("localhost", 8091)))[1]
 
     assert "class Sitemap" in response.body
