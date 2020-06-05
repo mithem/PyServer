@@ -15,6 +15,7 @@ A really simple-to-use HTTP-server!
   - [Request & Response](#request--response)
   - [Resource](#resource)
 - [serverly.user](#serverlyuser)
+- [serverly.statistics](#serverlystatistics)
 
 ## Configuration
 
@@ -172,3 +173,26 @@ serverly.objects.StaticResource(folder_path: str, endpoint_path: str, file_exten
 ## serverly.user
 
 This subpackage allows very easy user-management right through serverly. See [SERVERLY.USER.md](https://github.com/mithem/serverly/blob/master/SERVERLY.USER.md) for more information.
+
+## serverly.statistics
+
+This module is used to save statistics of the server as well as individual endpoints and print them after shutdown as well as saving them to `filename` (defaults to 'statistics.json'). It has the following attributes for holding stats:
+
+```python
+overall_performance = {
+  'min': 2.7182818284,
+  'max': 11.11111,
+  'mean': 3.1415926535,
+  'len': 42
+}
+endpoint_performance = {
+  'my_endpoint': {
+    'min': 3.292932383827,
+    'max': 17.223480972,
+    'mean': 6.182849,
+    'len': 42
+  }
+}
+```
+
+Also, it has the functions `new_statistic(function: str, time: float)` and `print_stats()`, both of which you probably don't need 🧐

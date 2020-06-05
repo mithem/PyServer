@@ -80,6 +80,7 @@ async def _read_body(receive):
 
 
 async def _uvicorn_server(scope, receive, send):
+    t1 = time.perf_counter()
     if scope["type"].startswith("lifespan"):
         event = await receive()
         s = event["type"].replace("lifespan.", "")
@@ -98,13 +99,12 @@ async def _uvicorn_server(scope, receive, send):
                 headers[str(hl[0], "utf-8")] = v
             request = Request(scope["method"], parse.urlparse(full_url),
                               headers, b, scope["client"])
-            t1 = time.perf_counter()
-            response: Response = _sitemap.get_content(request)
-            t2 = time.perf_counter()
+            func, response = _sitemap.get_content(request)
             response_headers = []
             for k, v in response.headers.items():
                 response_headers.append(
                     [bytes(k, "utf-8"), serverly.utils.get_bytes(v)])
+            t2 = time.perf_counter()
             await send({
                 "type": "http.response.start",
                 "status": response.code,
@@ -130,7 +130,6 @@ async def _uvicorn_server(scope, receive, send):
                     "type": "http.response.body",
                     "body": serverly.utils.get_bytes(chunks[-1], mimetype)
                 })
-            serverly.statistics.calculation_times.append(t2 - t1)
         except Exception as e:
             logger.handle_exception(e)
             if scope["type"] != "lifespan":
@@ -145,6 +144,8 @@ async def _uvicorn_server(scope, receive, send):
                     "type": "http.response.body",
                     "body": c
                 })
+        serverly.statistics.new_statistic(func, t2 - t1)
+
     else:
         try:
             raise NotImplementedError(
@@ -330,10 +331,13 @@ class Sitemap:
 
     def get_func_or_site_response(self, site, request: Request):
         try:
+            s = "unknown"
             response = Response()
             if isinstance(site, StaticSite):
                 response = site.get_content()
+                s = str(site)
             else:
+                s = site.__name__
                 try:
                     content = site(request)
                 except TypeError as e:  # makes debugging easier
@@ -380,7 +384,7 @@ class Sitemap:
                     "/SUPERPATH/", self.superpath).replace("SUPERPATH/", self.superpath)
             except:
                 pass
-            return response
+            return (s, response)
         except Exception as e:
             logger.handle_exception(e)
             return error_response(500, str(e))
@@ -397,7 +401,7 @@ class Sitemap:
             response = self.get_func_or_site_response(
                 site, request)
         try:
-            response = self.get_func_or_site_response(
+            func, response = self.get_func_or_site_response(
                 site, request)
         except Exception as e:
             logger.handle_exception(e)
@@ -405,7 +409,7 @@ class Sitemap:
             response = self.get_func_or_site_response(
                 site, "")
             serverly.stater.error(logger)
-        return response
+        return (func, response)
 
 
 _sitemap = Sitemap()

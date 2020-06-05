@@ -243,6 +243,9 @@ class StaticSite:
         """register it, so you don't have to"""
         serverly.register_function("GET", self.path, self)
 
+    def __str__(self):
+        return f"<StaticSite(file_path='{self.file_path}', path='{self.path}')>"
+
 
 class Resource:
     """An API resource specifying how an endpoint looks. You can tell it where to sit with `__path__` and define it's endpoints in `__map__`
