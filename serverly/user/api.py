@@ -11,6 +11,7 @@ from functools import wraps
 from urllib import parse as parse
 
 import serverly
+import serverly.statistics
 import serverly.user
 import serverly.user.mail
 import serverly.utils
@@ -51,6 +52,7 @@ def use(function: str, method: str, path: str):
     - DEL console.api.endpoint.del: Basic (delete existing endpoint identified by method & path)
     - GET console.api.summary.users: Basic (API for getting a summary of all users)
     - GET console.api.summary.endpoints: Basic (API for getting a summary of all endpoints registered)
+    - GET console.api.summary.statistics: Basic (API for getting a summary of the overall server statistics)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
     - PUT console.api.user.change_or_register: Basic (API endpoint for changing or registering users)
     - POS console.api.users.verify: Basic (verify all users with ids submitted in request body)
@@ -86,6 +88,7 @@ def use(function: str, method: str, path: str):
         "console.api.endpoint.del": _console_api_endpoint_delete,
         "console.api.summary.users": _console_summary_users,
         "console.api.summary.endpoints": _console_summary_endpoints,
+        "console.api.summary.statistics": _console_summary_statistics,
         "console.api.user.get": _console_api_get_user,
         "console.api.user.change_or_register": _console_api_change_or_create_user,
         "console.api.users.verify": _console_api_verify_users,
@@ -95,7 +98,7 @@ def use(function: str, method: str, path: str):
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
         "console.api.endpoints.get": _console_api_endpoints_get,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -399,6 +402,16 @@ def _console_summary_endpoints(request: Request):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(body=e)
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_summary_statistics(request: Request):
+    def r(f):
+        return round(f, 2)
+    d = serverly.statistics.overall_performance
+    return Response(body=f"The average calculation time is {r(d['mean'])} ms, with a min of {r(d['min'])} and a max of {r(d['max'])}.")
 
 
 @basic_auth
