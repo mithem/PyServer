@@ -45,12 +45,12 @@ def new_statistic(function: str, time: float):
 
 def print_stats():
     """Print statistics saved in this module."""
-    try:
+    if overall_performance["len"] > 0:
         print("\n\nCalculation times (ms):\n")
         print(tabulate([overall_performance.values()],
                        tuple(overall_performance.keys())))
-        with open(filename, "w+") as f:
-            json.dump(
-                {"overall_performance": overall_performance, "endpoint_performance": endpoint_performance}, f)
-    except ValueError:
+    else:
         print("No statistics.")
+    with open(filename, "w+") as f:
+        json.dump({"overall_performance": overall_performance,
+                   "endpoint_performance": endpoint_performance}, f)
