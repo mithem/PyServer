@@ -54,3 +54,17 @@ def print_stats():
     with open(filename, "w+") as f:
         json.dump({"overall_performance": overall_performance,
                    "endpoint_performance": endpoint_performance}, f)
+
+
+def reset():
+    """Reset all stats."""
+    global overall_performance, endpoint_performance
+
+    overall_performance = {
+        "min": 100000000000.0,
+        "max": 0.0,
+        "mean": 0.0,
+        "len": 0
+    }
+
+    endpoint_performance = {}

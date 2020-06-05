@@ -244,7 +244,7 @@ class StaticSite:
         serverly.register_function("GET", self.path, self)
 
     def __str__(self):
-        return f"<StaticSite(file_path='{self.file_path}', path='{self.path}')>"
+        return f"StaticSite ({self.path})"
 
 
 class Resource:

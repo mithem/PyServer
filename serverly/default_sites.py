@@ -81,6 +81,21 @@ console_index = r"""<!DOCTYPE html>
         req.open("GET", "SUPERPATH$_console_summary_endpoints");
         req.send(null);
       }
+      function updateStatisticsSummary() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status !== 200) {
+              handleResponse(req);
+            }
+            document.querySelector(
+              ".summaries > .summary#summary-statistics > p"
+            ).textContent = req.responseText;
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_summary_statistics");
+        req.send(null);
+      }
     </script>
   </head>
   <body>
@@ -96,11 +111,16 @@ console_index = r"""<!DOCTYPE html>
         <a href="SUPERPATH$_console_endpoints" class="mylink">endpoints</a>
         <p>Loading...</p>
       </div>
+      <div class="summary" id="summary-statistics">
+        <a href="SUPERPATH$_console_statistics" class="mylink">statistics</a>
+        <p>Loading...</p>
+      </div>
     </div>
   </body>
   <script>
     updateUserSummary();
     updateEndpointSummary();
+    updateStatisticsSummary();
   </script>
 </html>
 """
@@ -113,22 +133,12 @@ console_users = r"""<!DOCTYPE html>
     <title>serverly admin console</title>
     <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css">
     <style>
-      .topicContainer {
-        background: white;
-        box-shadow: 0px 0px 6px #cccccc;
-        width: 95%;
-        height: 90%;
-        padding: 20px;
-        margin: 30px auto 0px auto;
-        border: none;
-        border-radius: 12px;
+      /*
+      .card {
         scrollbar-color: var(--scrollbar-thumb-color)
           var(--scrollbar-track-color);
       }
-      .topicContainer > span {
-        font-size: 26px;
-        font-weight: 600;
-      }
+      */
       .tableContainer {
         height: 500px;
         overflow: scroll;
@@ -145,12 +155,6 @@ console_users = r"""<!DOCTYPE html>
       }
       table tr:nth-child(even) {
         background-color: var(--table-cell-highlight-color);
-      }
-      @media (prefers-color-scheme: dark) {
-        .topicContainer {
-          background-color: #3f3f3f;
-          box-shadow: 0px 0px 6px #444444;
-        }
       }
     </style>
     <script src="SUPERPATH/console/static/js/main.js"></script>
@@ -247,7 +251,7 @@ console_users = r"""<!DOCTYPE html>
     <nav>
       <a href="/console">serverly admin console</a>
     </nav>
-    <div class="topicContainer">
+    <div class="card">
       <span>actions</span>
       <div class="actions">
         <button class="action" id="change" onclick="change();">change/register</button>
@@ -258,7 +262,7 @@ console_users = r"""<!DOCTYPE html>
         <button class="action" id="resetPassword" onclick="resetPassword();">reset password</button>
       </div>
     </div>
-    <div class="topicContainer">
+    <div class="card">
       <span>users</span>
       <div class="tableContainer">
         $user_table
@@ -310,10 +314,6 @@ console_user_change_or_create = r"""<!DOCTYPE html>
         min-width: 400px;
         width: 100%;
         height: 600px;
-      }
-      .card > span {
-        font-size: 26px;
-        font-weight: 600;
       }
     </style>
   </head>
@@ -467,13 +467,6 @@ console_endpoints = r"""<!DOCTYPE html>
         width: 100%;
         overflow-x: hidden;
       }
-      .card > span {
-        font-size: 26px;
-        font-weight: 600;
-      }
-      .actions button {
-        margin: 10px;
-      }
       table {
         width: 100%;
         margin: 5px;
@@ -617,6 +610,131 @@ console_endpoints = r"""<!DOCTYPE html>
 </html>
 """
 
+console_statistics = r"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/console/static/css/main.css" />
+    <title>serverly admin console</title>
+    <script src="/console/static/js/main.js"></script>
+    <style>
+      body {
+        overflow-y: scroll;
+      }
+      .method-heading {
+        font-size: 22px;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+      .card {
+        width: 100%;
+        overflow-x: hidden;
+      }
+      table {
+        width: 100%;
+        margin: 5px;
+        text-align: left;
+        border-collapse: collapse;
+      }
+      table th {
+        font-weight: 500;
+        font-style: italic;
+      }
+      table tr:nth-child(even){
+        background-color: var(--table-cell-highlight-color);
+      }
+      .tableContainer {
+        height: 500px;
+        overflow: scroll;
+      }
+      @media screen and (max-width: 750px){
+        .card {
+          overflow-x: scroll;
+        }
+      }
+    </style>
+    <script>
+      function sortOnKeys(dict) {
+        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
+        var sorted = [];
+        for(var key in dict) {
+            sorted[sorted.length] = key;
+        }
+        sorted.sort();
+
+        var tempDict = {};
+        for(var i = 0; i < sorted.length; i++) {
+            tempDict[sorted[i]] = dict[sorted[i]];
+        }
+
+        return tempDict;
+      }
+      function drawStatistics(stats) {
+        let table = document.getElementById("statsTable");
+        var result = "";
+        for(let [func, data] of Object.entries(sortOnKeys(stats))){
+          result += "<tr><td>" + func + "</td><td>" + data.mean.toFixed(3) + "</td><td>" + data.min.toFixed(3) + "</td><td>" + data.max.toFixed(3) + "</td><td>" + data.len + "</td></tr>";
+        }
+        table.innerHTML = result;
+      }
+      function loadStats() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status === 200) {
+              drawStatistics(JSON.parse(req.responseText));
+            } else {
+              handleResponse(req);
+            }
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_api_statistics_get");
+        req.send(null);
+      }
+      function resetStatistics() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_statistics_reset");
+        req.send(null);
+      }
+    </script>
+  </head>
+  <body>
+    <nav>
+      <a href="SUPERPATH$_console_index">serverly admin console</a>
+    </nav>
+    <div class="card">
+      <span>actions</span>
+      <div class="actions">
+        <button onclick="resetStatistics()">reset</button>
+      </div>
+    </div>
+    <div class="card" id="statsContainer">
+      <table>
+        <thead>
+          <tr>
+            <th>function</th>
+            <th>mean</th>
+            <th>min</th>
+            <th>max</th>
+            <th>length</th>
+          </tr>
+        </thead>
+        <tbody id="statsTable">
+        </tbody>
+      </table>
+    </div>
+  </body>
+  <script>
+    loadStats();
+  </script>
+</html>
+"""
+
 password_reset_page = r"""<!DOCTYPE html><html lang="en_US"><head><title>Reset password</title><script src="SUPERPATH/console/static/js/main.js"></script></head><body><script>var password = prompt("Your new password?");var req = new XMLHttpRequest();req.onreadystatechange= () => {if(req.readyState===4){handleResponse(req); if(req.status === 200){document.body.innerHTML = "<p>Password reset successful. You may now close this.</p>";}}}; req.open("POST", "SUPERPATH/api/resetpassword"); req.setRequestHeader("Authorization", "Bearer ${identifier}");req.send(JSON.stringify({password: password}));</script></body></html>"""
 
 console_js_main = r"""function handleResponse(res){
@@ -669,7 +787,12 @@ console_css_main = """body {
         background-color: white;
       }
       .card > span {
+        font-size: 26px;
+        font-weight: 500;
         padding: 10px;
+      }
+      .actions button {
+        margin: 10px;
       }
       .tableContainer {
         height: 500px;
