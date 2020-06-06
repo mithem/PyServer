@@ -24,26 +24,6 @@ except:
     pass
 
 
-def test_get_server_address():
-    valid = ("localhost", 8080)
-    assert serverly.utils.get_server_address(("localhost", 8080)) == valid
-    assert serverly.utils.get_server_address("localhost,8080") == valid
-    assert serverly.utils.get_server_address("localhost, 8080") == valid
-    assert serverly.utils.get_server_address("localhost;8080") == valid
-    assert serverly.utils.get_server_address("localhost; 8080") == valid
-    assert serverly.utils.get_server_address("localhost:8080") == valid
-    assert serverly.utils.get_server_address("localhost::8080") == valid
-    assert serverly.utils.get_server_address("localhost|8080") == valid
-    assert serverly.utils.get_server_address("localhost||8080") == valid
-
-
-def test_get_server_address_2():
-    valid = ("localhost", 8080)
-    with pytest.raises(Exception):
-        with pytest.warns(UserWarning, match="bostname and port are in the wrong order. Ideally, the addresses is a tuple[str, int]."):
-            serverly.Server._get_server_address((8080, "local#ost"))
-
-
 def test_sitemap():
     def hello_world(req):
         return serverly.Response(body="hello world!")
@@ -53,112 +33,6 @@ def test_sitemap():
         "GET", parse.urlparse("/notavalidurlactuallyitisvalid"), {}, "", (0, 0))
     assert serverly._sitemap.get_content(r1)[1].body == "hello world!"
     assert "404 - Page not found" in serverly._sitemap.get_content(r2)[1].body
-
-
-def test_request():
-    content = "Hello, World!"
-    req = serverly.Request(
-        "GET", "/helloworld", {"content-type": "text/plain"}, content, ("localhost", 8080))
-    assert req.body == content
-    assert req.obj == None
-    assert req.headers == {"content-type": "text/plain"}
-    assert req.address == ("localhost", 8080)
-    assert req.path == "/helloworld"
-    assert req.method == "get"
-
-    assert req.auth_type == None
-    assert req.user_cred == None
-
-
-def test_response():
-    content = "<html><h1>Hello, World</h1></html>"
-    res = serverly.Response(body=content)
-
-    assert res.headers == {"content-type": "text/html"}
-    assert res.body == content
-    assert res.code == 200
-    assert res.obj == None
-
-
-def test_response_2():
-    from serverly.user import User
-    u = User()
-    u.id = 1
-    u.username = "oh yeah!"
-    u.password = "totallyhashed"
-    u.salt = "totallyrandom"
-    res = serverly.Response(body=u)
-
-    d = {
-        "id": 1,
-        "username": "oh yeah!",
-        "password": "totallyhashed",
-        "salt": "totallyrandom"
-    }
-
-    assert res.headers["content-type"] == "application/json"
-
-    assert res.code == 200
-    assert res.obj == d
-
-    j = json.loads(res.body)
-    for k, v in j.items():
-        assert d[k] == v
-
-
-def test_response_3():
-    d = {"hello": True, "wow": 12}
-
-    res = serverly.Response(body=d)
-
-    assert res.obj == d
-    assert res.body == json.dumps(d)
-
-
-def test_response_4():
-    d = ["a", "b", "c", 4, 6, 7]
-
-    res = serverly.Response(body=d)
-
-    assert res.body == json.dumps(d)
-    assert res.obj == d
-
-
-def test_response_5():
-    f = open("test_serverly.py", "r")
-    c = f.read()
-    r = serverly.Response(body=f)
-    assert r.obj.name == "test_serverly.py"
-    assert c.startswith("import ")
-    assert r.body == c
-
-
-def test_ranstr():
-    s = []
-    for _ in range(10000):
-        r = serverly.utils.ranstr()
-        assert len(r) == 20
-        assert not r in s
-        s.append(r)
-
-
-def test_guess_response_headers():
-    c1 = "<html lang='en_US'><h1>Hello World!</h1></html>"
-    h1 = {"content-type": "text/html"}
-    assert serverly.utils.guess_response_headers(c1) == h1
-
-    c2 = "Hello there!"
-    h2 = {"content-type": "text/plain"}
-    assert serverly.utils.guess_response_headers(c2) == h2
-
-    c3 = {"hello": True}
-    h3 = {"content-type": "application/json"}
-    assert serverly.utils.guess_response_headers(c3) == h3
-
-    c4 = {"id": 1, "password": "totallyhashed",
-          "salt": "totallyrandom", "username": "oh yeah!"}
-    h4 = {"content-type": "application/json"}
-    assert serverly.utils.guess_response_headers(c4) == h4
 
 
 @pytest.mark.skipif("not address_available")

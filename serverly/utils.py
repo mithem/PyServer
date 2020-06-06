@@ -19,13 +19,17 @@ def ranstr(size=20, chars=string.ascii_lowercase + string.digits + string.ascii_
 
 def check_relative_path(path: str):
     """Check if a path is valid as a web address. Returns True if valid, else raises different kinds of errors"""
-    if type(path) == str:
-        if path[0] == "/" or (path[0] == "^" and path[1] == "/"):
-            return True
+    value_error = ValueError(f"'{path}' (as a path) doesn't start with '/'.")
+    try:
+        if type(path) == str:
+            if path[0] == "/" or (path[0] == "^" and path[1] == "/"):
+                return True
+            else:
+                raise value_error
         else:
-            raise ValueError(f"'{path}' (as a path) doesn't start with '/'.")
-    else:
-        raise TypeError("path not valid. Expected to be of type string.")
+            raise TypeError("path not valid. Expected to be of type string.")
+    except IndexError:
+        raise value_error
 
 
 def get_http_method_type(method: str):
@@ -48,10 +52,6 @@ def check_relative_file_path(file_path: str):
     else:
         raise TypeError(
             "file_path argument expected to be of type string.")
-
-
-def guess_filetype_on_filename(filename):
-    return mimetypes.guess_type(filename)
 
 
 def is_json_serializable(obj):
@@ -116,8 +116,8 @@ def get_server_address(address):
                 hostname = address[1]
                 if address[0] > 0:
                     port = address[0]
-            else:
-                raise Exception("hostname specified not valid")
+        else:
+            raise ValueError("hostname specified not valid")
     else:
         raise TypeError(
             "address argument not of valid type. Expected type[str, int] (hostname, port)")
@@ -134,13 +134,9 @@ def parse_scope_list(scope: str):
 
 
 def get_scope_list(scope: Union[str, list]):
-    try:
-        if type(scope) == str:
-            scope = [scope]
-        return ";".join(scope)
-    except Exception as e:
-        serverly.logger.handle_exception(e)
-        return ""
+    if type(scope) == str:
+        scope = [scope]
+    return ";".join(scope)
 
 
 def parse_role_hierarchy(hierarchy: dict):
@@ -179,7 +175,11 @@ def get_chunked_response(response):
         """https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks"""
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
-    return list(chunks(response.body, response.bandwidth))
+    if response.bandwidth != None:
+        b = response.bandwidth
+    else:
+        return [response.body]
+    return list(chunks(response.body, b))
 
 
 def lowercase_dict(d: dict, values=False):

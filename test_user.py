@@ -145,7 +145,8 @@ def test_clean_user_object_3():
         "temporary", "read", d)
     t2 = serverly.user.auth.get_new_token("temporary", "write", d)
 
-    n = serverly.utils.clean_user_object([t1, t2], "id")
+    n = serverly.utils.clean_user_object(
+        [t1, t2], "id", "notanattributeanyway")
 
     a = [{"username": "temporary", "expires": i,
           "scope": "read", "value": t1.value, "id": 1}, {"username": "temporary", "expires": i, "scope": "write", "value": t2.value, "id": 2}
@@ -153,38 +154,3 @@ def test_clean_user_object_3():
 
     for i in a:
         assert i in n
-
-
-def test_parse_role_hierarchy():
-    e1 = {
-        "normal": "normal",
-        "admin": "normal"
-    }
-    e2 = {
-        "normal": "normal",
-        "admin": "normal",
-        "staff": "admin",
-        "root": "staff",
-        "god": "staff",
-    }
-    e3 = {
-        "normal": "normal",
-        "admin": "normal",
-        "staff": "normal",
-        "root": {"admin", "staff"},
-        "god": "root"
-    }
-
-    r1 = serverly.utils.parse_role_hierarchy(e1)
-    r2 = serverly.utils.parse_role_hierarchy(e2)
-    r3 = serverly.utils.parse_role_hierarchy(e3)
-
-    assert r1 == {"normal": {"normal"}, "admin": {"normal"}}
-    assert r2 == {"normal": {"normal"}, "admin": {"normal"}, "staff": {
-        "admin", "normal"}, "root": {"admin", "normal", "staff"}, "god": {"admin", "normal", "staff"}}
-    assert r3 == {"normal": {"normal"}, "admin": {"normal"},
-                  "staff": {"normal"}, "root": {"admin", "normal", "staff"}, "god": {"admin", "normal", "staff", "root"}}
-
-
-if __name__ == "__main__":
-    test_parse_role_hierarchy()
