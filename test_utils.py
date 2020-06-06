@@ -66,11 +66,11 @@ def test_guess_response_headers():
     assert guess_response_headers(c5) == h5
     c5.close()
 
-    c6 = open("temporary.md", "w+")
+    c6 = open("temporary.notanactualfilenamesomimetypescantguessit", "w+")
     h6 = {"content-type": "text/plain"}
     assert guess_response_headers(c6) == h6
     c6.close()
-    os.remove("temporary.md")
+    os.remove("temporary.notanactualfilenamesomimetypescantguessit")
 
     c7 = bytes("hello world", "utf-8")
     h7 = {"content-type": "application/octet-stream"}
