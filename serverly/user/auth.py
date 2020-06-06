@@ -20,8 +20,8 @@ from typing import Union
 import serverly
 import serverly.utils
 from serverly.objects import Request, Response
-from serverly.user import (BearerToken, User, _Session, require_verified,
-                           session_renew_treshold, _setup_required)
+from serverly.user import (BearerToken, User, require_verified,
+                           session_renew_treshold)
 from serverly.user.err import NotAuthorizedError, UserNotFoundError
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
@@ -118,7 +118,7 @@ def session_auth(func):
 @serverly.user._setup_required
 def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Union[str, list] = None):
     """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
-    session = _Session()
+    session = serverly.user._Session()
     if type(bearer_token) == str:
         token: BearerToken = session.query(
             BearerToken).filter_by(value=bearer_token).first()
@@ -140,37 +140,43 @@ def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Unio
     return token != None and b and c
 
 
+@serverly.user._setup_required
 def clear_expired_tokens():
     """Delete (permanently) all BearerTokens which are expired and return how many where deleted."""
-    session = _Session()
-    tokens = session.query(BearerToken).filter_by(
-        BearerToken.expires.isnot(None))
-    n = datetime.datetime.now()
-    i = 0
-    for token in tokens:
-        if token.expires < n:
-            session.delete(token)
-            i += 1
-    session.commit()
-    return i
+    try:
+        session = serverly.user._Session()
+        tokens = session.query(BearerToken).filter(
+            BearerToken.expires.isnot(None))
+        n = datetime.datetime.now()
+        i = 0
+        for token in tokens:
+            if token.expires < n:
+                session.delete(token)
+                i += 1
+        session.commit()
+        return i
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return -1
 
 
+@serverly.user._setup_required
 def get_tokens_by_user(username: str):
     """Return a list of all BearerToken objects corresponding to a user."""
-    session = _Session()
+    session = serverly.user._Session()
     tokens = session.query(BearerToken).filter_by(username=username).all()
     session.close()
     return tokens
 
 
-@_setup_required
+@serverly.user._setup_required
 def get_new_token(username: str, scope: Union[str, list] = [], expires: Union[datetime.datetime, str] = None):
     """Generate a new token, save it for `username` and return it (obj)."""
     try:
         if type(expires) == str:
             expires = datetime.datetime.fromisoformat(expires)
 
-        session = _Session()
+        session = serverly.user._Session()
         token = BearerToken()
         token.username = str(username)
         token.scope = serverly.utils.get_scope_list(scope)

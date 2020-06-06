@@ -97,7 +97,7 @@ def mockup_hash_algorithm(data: bytes):
     return HashOutput(data)
 
 
-def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False, role_hierarchy={}):
+def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_users.db", user_columns={}, verbose=False, require_email_verification=False, role_hierarchy={}, debug=False):
     """
 
     :param hash_algorithm:  (Default value = hashlib.sha3_512) Algorithm used to hash passwords (and salts if specified). Needs to work like hashlib's: algo(bytes).hexadigest() -> str.
@@ -133,8 +133,8 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
         'root': 'admin'
     }
     ```
-    Now, admins & staff have the same rights as normals, root has the same as admin & staff (and therefore normals).
-
+    Now, admins & staff have the same rights as normals, root has the same as admin & staff (and therefore normals), but you can still decide to require 'admin' for some endpoint.
+    :param debug: Debug mode (Just prints out the configuration)
     """
     global _engine
     global _Session
@@ -176,8 +176,9 @@ def setup(hash_algorithm=hashlib.sha3_512, use_salting=True, filename="serverly_
 
     _role_hierarchy = serverly.utils.parse_role_hierarchy(role_hierarchy)
 
+    serverly.logger.context = "setup"
     serverly.logger.debug(
-        f"serverly.user is now set up with the following configuration:\nalgorithm: {hash_algorithm.__name__}\nsalting: {bool(salting)}\nrequire email verification: {require_email_verification}\nrole hierarchy: {_role_hierarchy}")
+        f"serverly.user is now set up with the following configuration:\nalgorithm: {hash_algorithm.__name__}\nsalting: {bool(salting)}\nrequire email verification: {require_email_verification}\nrole hierarchy: {_role_hierarchy}", debug)
 
 
 def _setup_required(func):

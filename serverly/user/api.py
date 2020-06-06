@@ -13,6 +13,7 @@ from urllib import parse as parse
 import serverly
 import serverly.statistics
 import serverly.user
+import serverly.user.auth
 import serverly.user.mail
 import serverly.utils
 from serverly import error_response
@@ -62,6 +63,7 @@ def use(function: str, method: str, path: str):
     - DEL console.api.user.reset_password: Basic (send a password reset mail to users with ids submitted in request body)
     - DEL console.api.users.delete: Basic (delete users with ids submitted in request body)
     - POS console.api.renew_login: Basic (authenticate with admin credentials. If not successfull, sends back the WWW-Authenticate: Basic header)
+    - DEL console.api.clear_expired_tokens: Basic (Call serverly.user.auth.clear_expired_tokens and return how many were deleted)
     - GET console.api.endpoints.get: Basic (get all endpoint details)
     - GET console.api.statistics.get: Basic (get endpoint statistics)
     - DEL console.api.statistics.reset: Basic (reset/delete all statistics)
@@ -101,10 +103,11 @@ def use(function: str, method: str, path: str):
         "console.api.users.delete": _console_api_delete_users,
         "console.api.users.reset_password": _console_api_reset_password,
         "console.api.renew_login": _console_api_renew_login,
+        "console.api.clear_expired_tokens": _console_api_clear_expired_tokens,
         "console.api.endpoints.get": _console_api_endpoints_get,
         "console.api.statistics.get": _console_api_statistics_get,
         "console.api.statistics.reset": _console_api_statistics_reset,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_clear_expired_tokens: ('DELETE', '/console/api/cleartokens'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -669,6 +672,17 @@ def _console_api_reset_password(request: Request):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(body=str(e))
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_api_clear_expired_tokens(request: Request):
+    try:
+        return Response(body=f"Deleted {str(serverly.user.auth.clear_expired_tokens())} tokens")
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(500, body=e)
 
 
 @basic_auth

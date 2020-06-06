@@ -7,9 +7,10 @@ import time
 from functools import wraps
 
 import serverly
+import serverly.user
 import yagmail
-from serverly.utils import ranstr
 from serverly.user import _requires_user_attr
+from serverly.utils import ranstr
 
 _default_special_emails = {
     "verification": {
@@ -154,6 +155,9 @@ class MailManager:
     def schedule(self, email={}, immediately=True):
         """schedule a new email: dict. 'email' or 'username' as well as 'subject' are required. Use 'schedule': Union[isoformat, datetime.datetime] to schedule it for some time in the future. Required if 'immediately' is False. If 'immediately' is True, send it ASAP."""
         try:
+            if email.get("email", email.get("mail", None)) == None:
+                if serverly.user.get(email["username"]).email == None:
+                    return False
             self._load()
             if immediately:
                 self.pending.append(email)
@@ -319,7 +323,9 @@ class MailManager:
             mail = self.get_substituted_mail(
                 email_type, **serverly.user.get(username).to_dict(), **subs)
             mail["username"] = username
-            self.schedule(mail)
+            b = self.schedule(mail)
+            if not b:
+                return False
             try:
                 with open("mailmanager.json", "r") as f:
                     try:
@@ -336,23 +342,21 @@ class MailManager:
             data[email_type][identifier] = username
             with open("mailmanager.json", "w") as f:
                 json.dump(data, f)
+            return True
         except Exception as e:
             serverly.logger.handle_exception(e)
             raise e
 
     def schedule_verification_mail(self, username: str):
-        self._identifier_based_special_mail(
+        return self._identifier_based_special_mail(
             "verification", username, "verify/")
 
     def schedule_confirmation_mail(self, username: str):
-        self._identifier_based_special_mail(
+        return self._identifier_based_special_mail(
             "confirmation", username, "confirm/")
 
     def schedule_password_reset_mail(self, username: str):
-        identifier = ranstr()
-        password_reset_url = self.online_url + \
-            serverly._sitemap.superpath + "reset-password/" + identifier
-        self._identifier_based_special_mail(
+        return self._identifier_based_special_mail(
             "password_reset", username, "reset-password/")
 
 

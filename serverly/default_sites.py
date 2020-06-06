@@ -230,6 +230,14 @@ console_users = r"""<!DOCTYPE html>
         req.open("DELETE", "SUPERPATH$_console_api_reset_password");
         req.send(JSON.stringify(ids));
       }
+      function clearExpiredTokens(){
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_clear_expired_tokens");
+        req.send(null);
+      }
     </script>
   </head>
   <body>
@@ -245,6 +253,7 @@ console_users = r"""<!DOCTYPE html>
         <button class="action" id="verimail" onclick="verimail();">verimail</button>
         <button class="action" id="delete" onclick="del();">delete</button>
         <button class="action" id="resetPassword" onclick="resetPassword();">reset password</button>
+        <button class="action" id="clearExpiredTokens" onclick="clearExpiredTokens();">clear expired tokens</button>
       </div>
     </div>
     <div class="card">
