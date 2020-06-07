@@ -17,33 +17,28 @@ class DBObject:
     """Subclass this to implement a `to_dict` method which is required by serverly to pass an object as a response body"""
 
     def to_dict(self, forbidden=[]):
-        try:
-            d = {}
-            for i in dir(self):
-                if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict" and not i in forbidden:
-                    a = getattr(self, i)
-                    try:
-                        if type(a) == str and a[0] == "[":
-                            try:
-                                a = jsonjson.loads(a)
-                            except:
-                                pass
-                    except:
-                        pass
-                    # json-serializable
-                    if is_json_serializable(a):
-                        d[i] = a
-                    elif issubclass(type(a), DBObject):
-                        d[i] = a.to_dict()
-                    elif isinstance(a, datetime.datetime):
-                        d[i] = a.isoformat()
-                    else:
-                        d[i] = str(a)
-            return d
-        except Exception as e:
-            import serverly
-            serverly.logger.handle_exception(e)
-            raise e
+        d = {}
+        for i in dir(self):
+            if not i.startswith("_") and not i.endswith("_") and not callable(i) and i != "metadata" and i != "to_dict" and not i in forbidden:
+                a = getattr(self, i)
+                try:
+                    if type(a) == str and a[0] == "[":
+                        try:
+                            a = jsonjson.loads(a)
+                        except:
+                            pass
+                except:
+                    pass
+                # json-serializable
+                if is_json_serializable(a):
+                    d[i] = a
+                elif issubclass(type(a), DBObject):
+                    d[i] = a.to_dict()
+                elif isinstance(a, datetime.datetime):
+                    d[i] = a.isoformat()
+                else:
+                    d[i] = str(a)
+        return d
 
 
 class CommunicationObject:
@@ -86,33 +81,29 @@ class CommunicationObject:
     def body(self, body: Union[str, dict, list, DBObject]):
         """str, dict, list, DBObject (or subclass) or file-like object"""
         def dictify(a):
-            try:
-                if type(a) == list:
-                    try:
-                        return jsonjson.dumps(a), a
-                    except:
-                        b = [dictify(i) for i in a]
-                        return jsonjson.dumps(b), b
-                elif type(a) == dict:
+            if type(a) == list:
+                try:
                     return jsonjson.dumps(a), a
-                elif type(a) == str:
-                    try:
-                        obj = jsonjson.loads(a)
-                    except jsonjson.JSONDecodeError:
-                        obj = None
-                    return a, obj
-                elif issubclass(a.__class__, DBObject):
-                    d = a.to_dict()
-                    return jsonjson.dumps(d), d
-                else:
-                    # man this was about an hour to debug 😥. Great it works though!!!
-                    a.seek(0)
-                    c = a.read()
-                    self._headers["content-type"] = mimetypes.guess_type(a.name)[
-                        0]
-                    return c, a
-            except Exception as e:
-                serverly.logger.handle_exception(e)
+                except:
+                    b = [dictify(i)[1] for i in a]
+                    return jsonjson.dumps(b), b
+            elif type(a) == dict:
+                return jsonjson.dumps(a), a
+            elif type(a) == str:
+                try:
+                    obj = jsonjson.loads(a)
+                except jsonjson.JSONDecodeError:
+                    obj = None
+                return a, obj
+            elif issubclass(a.__class__, DBObject):
+                d = a.to_dict()
+                return jsonjson.dumps(d), d
+            else:
+                a.seek(0)
+                c = a.read()
+                self._headers["content-type"] = mimetypes.guess_type(a.name)[
+                    0]
+                return c, a
         self._body, self._obj = dictify(body)
 
     def __del__(self):
@@ -138,40 +129,37 @@ class Request(CommunicationObject):
     """
 
     def __init__(self, method: str, path: urllib.parse.ParseResult, headers: dict, body: Union[str, dict], address: tuple):
-        try:
-            super().__init__(headers, body)
+        super().__init__(headers, body)
 
-            self.method = get_http_method_type(method)
-            self.path = path
-            self.address = address
+        self.method = get_http_method_type(method)
+        self.path = path
+        self.address = address
 
-            self.authenticated = False
-            for key, value in self.headers.items():
-                if key.lower() == "authentication" or key.lower() == "authorization":
-                    auth = tuple(value.split(" "))
-                    self.auth_type = auth[0].lower()
-                    user_cred = auth[1]
-                    if self.auth_type.lower() == "basic":
-                        try:
-                            decoded = str(base64.b64decode(user_cred), "utf-8")
-                            self.user_cred = tuple(decoded.split(":"))
-                        except UnicodeDecodeError as e:
-                            serverly.logger.handle_exception(e)
-                            break
-                    elif self.auth_type.lower() == "bearer":
-                        self.user_cred = user_cred
-                    else:
-                        self.user_cred = None
-                        try:
-                            raise Warning(
-                                "Requested auth method not supported. Expected Basic or Bearer.")
-                        except Warning as e:
-                            serverly.logger.show_warning(e)
+        self.authenticated = False
+        for key, value in self.headers.items():
+            if key.lower() == "authentication":
+                auth = tuple(value.split(" "))
+                self.auth_type = auth[0].lower()
+                user_cred = auth[1]
+                if self.auth_type == "basic":
+                    try:
+                        decoded = str(base64.b64decode(user_cred), "utf-8")
+                        self.user_cred = tuple(decoded.split(":"))
+                        self.authenticated = True
+                    except UnicodeDecodeError as e:
+                        serverly.logger.handle_exception(e)
+                        break
+                elif self.auth_type == "bearer":
+                    self.user_cred = user_cred
                     self.authenticated = True
-            if not self.authenticated:
-                self._set_auth_none()
-        except Exception as e:
-            serverly.logger.handle_exception(e)
+                else:
+                    try:
+                        raise Warning(
+                            "Requested auth method not supported. Expected basic or bearer.")
+                    except Warning as e:
+                        serverly.logger.show_warning(e)
+        if not self.authenticated:
+            self._set_auth_none()
 
     def _set_auth_none(self):
         self.auth_type = None
@@ -210,8 +198,8 @@ class Response(CommunicationObject):
 class Redirect(Response):
     """Behaves like a Response object. Return it to redirect client to path. If required, you can change the code from 303 - See other (GET only) to whatever you like (might not redirect of course)."""
 
-    def __init__(self, path: str, code=303):
-        super().__init__(code, {"Location": path})
+    def __init__(self, path: str, code=303, **extra_headers):
+        super().__init__(code, {"location": path, **extra_headers})
 
 
 class StaticSite:
@@ -228,20 +216,17 @@ class StaticSite:
 
     def get_content(self):
         """get content from file. Used by serverly."""
-        if self.path == "^/error$" or self.path == "none" or self.file_path == "^/error$" or self.file_path == "none":
-            return Response(500, body="<html><head><title>Error</title></head><body><h1>An error occured.</h1></body></html>")
-        else:
-            try:
-                f = open(self.file_path, "r")
-                f.seek(0)
-                f.read()
-            except UnicodeDecodeError:
-                f = open(self.file_path, "rb")
-            return Response(body=f)
+        try:
+            f = open(self.file_path, "r")
+            f.seek(0)
+            f.read()
+        except UnicodeDecodeError:
+            f = open(self.file_path, "rb")
+        return Response(body=f)
 
     def use(self):
         """register it, so you don't have to"""
-        serverly.register_function("GET", self.path, self)
+        serverly._sitemap.register_site("GET", self)
 
     def __str__(self):
         return f"StaticSite ({self.path})"

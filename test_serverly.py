@@ -75,45 +75,8 @@ def test_server():
 
     p.start()
 
-    time.sleep(5)
+    time.sleep(0.5)
 
     evaluate()
 
     p.terminate()
-
-
-def test_resource():
-    class Test(serverly.objects.Resource):
-        @staticmethod
-        def a(request):
-            return serverly.Response(body="on a!")
-
-        def __init__(self):
-            super().__init__()
-            self.__path__ = "/test/serverly/"
-            self.__map__ = {
-                ("GET", "/a"): self.a,
-                ("GET", "/b"): lambda request: serverly.Response(body="on b!"),
-                ("GET", "/c"): serverly.objects.StaticSite("/c", "setup.py"),
-                ("GET", "/d"): "test_serverly.py"
-            }
-
-    Test().use()
-
-    assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/a"), {}, "", ("localhost", 8091)))[1].body == "on a!"
-    assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/b"), {}, "", ("localhost", 8091)))[1].body == "on b!"
-    assert serverly._sitemap.get_content(serverly.Request(
-        "GET", parse.urlparse("/test/serverly/c"), {}, "", ("localhost", 8091)))[1].body.startswith("import ")
-    assert serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
-        "/test/serverly/d"), {}, "", ("localhost", 8091)))[1].body.startswith("import ")
-
-
-def test_static_resource():
-    serverly.objects.StaticResource("serverly", "/folders/")
-
-    response = serverly._sitemap.get_content(serverly.Request("GET", parse.urlparse(
-        "/folders/serverly/__init__.py"), {}, "", ("localhost", 8091)))[1]
-
-    assert "class Sitemap" in response.body
