@@ -17,3 +17,4 @@ favicon.ico
 reset.py
 Dockerfile
 console/
+*.pem
