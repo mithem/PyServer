@@ -165,14 +165,22 @@ class Server:
         logger.context = "startup"
         logger.success("Server initialized", False)
 
-    def run(self):
+    def run(self, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
         try:
             serverly.stater.set(0)
         except Exception as e:
             logger.handle_exception(e)
         log_level = "info" if _sitemap.debug else "warning"
+        self.ssl_key_file = ssl_key_file
+        self.ssl_cert_file = ssl_cert_file
+        self.redirect_to_https = redirect_to_https
+        kwargs = {}
+        if ssl_key_file != None:
+            kwargs["ssl_keyfile"] = ssl_key_file
+        if ssl_cert_file != None:
+            kwargs["ssl_certfile"] = ssl_cert_file
         uvicorn.run(_uvicorn_server,
-                    host=address[0], port=address[1], log_level=log_level, lifespan="on")
+                    host=address[0], port=address[1], log_level=log_level, lifespan="on", **kwargs)
         self.close()
 
     def close(self):
@@ -196,8 +204,9 @@ def _update_status(new_status: str):
     """[internal] Update status of the server and act/log accordingly. Accepts status str as specified a ASGI lifespan."""
     if new_status == "startup":
         logger.context = "startup"
+        prefix = "https" if _server.ssl_cert_file != None and _server.ssl_key_file != None else "http"
         logger.success(
-            f"Server started http://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
+            f"Server started {prefix}://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
     elif new_status == "startup.failed" or new_status == "shutdown":
         _server.close()
     else:
@@ -248,8 +257,8 @@ def _reset_password_for_real(req: Request):
 
 class Sitemap:
     def __init__(self, superpath: str = "/", error_page: dict = None, debug=False):
-        """
-        Create a new Sitemap instance
+        """[internal]
+
         :param superpath: path which will replace every occurence of '/SUPERPATH/' or 'SUPERPATH/'. Great for accessing multiple servers from one domain and forwarding the requests to this server.
         :param error_page: default error page
 
@@ -415,18 +424,20 @@ def unregister(method: str, path: str):
     return _sitemap.unregister_site(method, path)
 
 
-def _start_server(superpath: str, debug=False):
+def _start_server(superpath: str, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
+    global _sitemap, _server
     _sitemap.superpath = superpath
     _sitemap.debug = debug
     _server = Server(address)
-    _server.run()
+    _server.run(ssl_key_file, ssl_cert_file, redirect_to_https)
 
 
-def start(superpath: str = '/', mail_active=False, debug=False):
+def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     try:
         logger.verbose = debug
-        args = tuple([superpath, debug])
+        args = tuple([superpath, debug, ssl_key_file,
+                      ssl_cert_file, redirect_to_https])
         server = multiprocessing.Process(
             target=_start_server, args=args)
         if mail_active:

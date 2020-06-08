@@ -28,6 +28,7 @@ console_index = r"""<!DOCTYPE html>
         }
       }
     </style>
+    <script src="SUPERPATH/console/static/js/main.js"/>
     <script>
       function renewLogin(){
         var req = new XMLHttpRequest();
@@ -39,8 +40,7 @@ console_index = r"""<!DOCTYPE html>
         req.onreadystatechange = () => {
           if (req.readyState === 4) {
             if (req.status !== 200) {
-              console.error("Server response for users summary not ok:");
-              console.error(req);
+              handleResponse(req);
             }
             document.querySelector(
               ".summaries > .summary#summary-users > p"
@@ -55,8 +55,7 @@ console_index = r"""<!DOCTYPE html>
         req.onreadystatechange = () => {
           if (req.readyState === 4) {
             if (req.status !== 200) {
-              console.error("Server response for endpoint summary not ok:");
-              console.error(req);
+              handleResponse(req);
             }
             document.querySelector(
               ".summaries > .summary#summary-endpoints > p"
@@ -90,15 +89,15 @@ console_index = r"""<!DOCTYPE html>
     <div class="summaries">
       <div class="summary" id="summary-users">
         <a href="SUPERPATH$_console_users" class="mylink">users</a>
-        <p>Loading...</p>
+        <p></p>
       </div>
       <div class="summary" id="summary-endpoints">
         <a href="SUPERPATH$_console_endpoints" class="mylink">endpoints</a>
-        <p>Loading...</p>
+        <p></p>
       </div>
       <div class="summary" id="summary-statistics">
         <a href="SUPERPATH$_console_statistics" class="mylink">statistics</a>
-        <p>Loading...</p>
+        <p></p>
       </div>
     </div>
   </body>

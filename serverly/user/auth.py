@@ -118,26 +118,30 @@ def session_auth(func):
 @serverly.user._setup_required
 def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Union[str, list] = None):
     """Return whether token is valid. If `expired`, also check whether it's expired and return False if it is."""
-    session = serverly.user._Session()
-    if type(bearer_token) == str:
-        token: BearerToken = session.query(
-            BearerToken).filter_by(value=bearer_token).first()
-    else:
-        token: BearerToken = bearer_token
-    if token.expires == None:
-        expired = False
-    b = token.expires > datetime.datetime.now() if expired else True
-    if type(scope) == str:
-        scope = [scope]
-    scopes = serverly.utils.parse_scope_list(token.scope)
-    c = True
-    if scope != [""]:
-        try:
-            for s in scope:
-                assert s in scopes
-        except AssertionError:
-            c = False
-    return token != None and b and c
+    try:
+        session = serverly.user._Session()
+        if type(bearer_token) == str:
+            token: BearerToken = session.query(
+                BearerToken).filter_by(value=bearer_token).first()
+        else:
+            token: BearerToken = bearer_token
+        if token.expires == None:
+            expired = False
+        b = token.expires > datetime.datetime.now() if expired else True
+        if type(scope) == str:
+            scope = [scope]
+        scopes = serverly.utils.parse_scope_list(token.scope)
+        c = True
+        if scope != [""]:
+            try:
+                for s in scope:
+                    assert s in scopes
+            except AssertionError:
+                c = False
+        return token != None and b and c
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return False
 
 
 @serverly.user._setup_required
@@ -163,10 +167,14 @@ def clear_expired_tokens():
 @serverly.user._setup_required
 def get_tokens_by_user(username: str):
     """Return a list of all BearerToken objects corresponding to a user."""
-    session = serverly.user._Session()
-    tokens = session.query(BearerToken).filter_by(username=username).all()
-    session.close()
-    return tokens
+    try:
+        session = serverly.user._Session()
+        tokens = session.query(BearerToken).filter_by(username=username).all()
+        session.close()
+        return tokens
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return []
 
 
 @serverly.user._setup_required

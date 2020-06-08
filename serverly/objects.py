@@ -137,7 +137,8 @@ class Request(CommunicationObject):
 
         self.authenticated = False
         for key, value in self.headers.items():
-            if key.lower() == "authentication":
+            kl = key.lower()
+            if kl == "authentication" or kl == "authorization":
                 auth = tuple(value.split(" "))
                 self.auth_type = auth[0].lower()
                 user_cred = auth[1]
