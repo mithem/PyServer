@@ -441,7 +441,7 @@ def _console_api_endpoints_get(request: Request):
             if callable(func):
                 new[k][path] = func.__name__
             else:
-                new[k][path] = type(func).__name__ + \
+                new[k]["^" + path + "$"] = type(func).__name__ + \
                     " (" + func.file_path + ")"
     return Response(body=new)
 

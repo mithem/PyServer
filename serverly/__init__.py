@@ -61,6 +61,7 @@ logger = Logger("serverly.log", "serverly", False, True)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
 error_response_templates = {}
+https_redirect_url: str = None
 
 
 async def _read_body(receive):
@@ -156,6 +157,41 @@ async def _uvicorn_server(scope, receive, send):
             logger.show_warning(e)
 
 
+async def _https_redirect_server(scope, receive, send):
+    assert scope["type"] == "http"
+    body = await _read_body(receive)
+    redir_url = https_redirect_url + \
+        scope["path"] + "?" + str(scope["query_string"], "utf-8")
+    if redir_url[0] == "/":
+        redir_url = redir_url[1:]
+    await send({
+        "type": "http.response.start",
+        "status": 303,
+        "headers": [[b"location", bytes(redir_url, "utf-8")]]
+    })
+    await send({
+        "type": "http.response.body",
+        "body": None
+    })
+
+
+def _https_redirect_server_start(port: int):
+    global https_redirect_url
+    try:
+        if https_redirect_url[0] != "/":
+            https_redirect_url = "/" + https_redirect_url
+    except TypeError:
+        try:
+            raise UserWarning(
+                "https_redirect_url not provided. Please make sure to set serverly's attribute so it knows where to send users connecting via HTTP.")
+        except Warning as w:
+            logger.show_warning(w)
+        return None
+    _https_redirect_url = https_redirect_url
+    uvicorn.run(_https_redirect_server,
+                host=address[0], port=port, lifespan="off", log_level="error")
+
+
 class Server:
     def __init__(self, server_address, name="serverly", description="A serverly instance."):
         self.name = name
@@ -165,7 +201,7 @@ class Server:
         logger.context = "startup"
         logger.success("Server initialized", False)
 
-    def run(self, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
+    def run(self, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https_from_port: int = None):
         try:
             serverly.stater.set(0)
         except Exception as e:
@@ -173,7 +209,10 @@ class Server:
         log_level = "info" if _sitemap.debug else "warning"
         self.ssl_key_file = ssl_key_file
         self.ssl_cert_file = ssl_cert_file
-        self.redirect_to_https = redirect_to_https
+        if redirect_to_https_from_port != None:
+            self.redirect_server = multiprocessing.Process(
+                target=_https_redirect_server_start, args=tuple([redirect_to_https_from_port]))
+            self.redirect_server.start()
         kwargs = {}
         if ssl_key_file != None:
             kwargs["ssl_keyfile"] = ssl_key_file
@@ -186,6 +225,7 @@ class Server:
     def close(self):
         logger.context = "shutdown"
         logger.debug("Shutting down server…", True)
+        self.redirect_server.terminate()
         try:
             serverly.stater.set(3)
         except Exception as e:
@@ -297,7 +337,6 @@ class Sitemap:
 
     def unregister_site(self, method: str, path: str):
         method = get_http_method_type(method)
-        check_relative_path(path)
         if path[0] != "^":
             path = "^" + path
         if path[-1] != "$":
@@ -424,20 +463,20 @@ def unregister(method: str, path: str):
     return _sitemap.unregister_site(method, path)
 
 
-def _start_server(superpath: str, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
+def _start_server(superpath: str, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https_from_port: int = None):
     global _sitemap, _server
     _sitemap.superpath = superpath
     _sitemap.debug = debug
     _server = Server(address)
-    _server.run(ssl_key_file, ssl_cert_file, redirect_to_https)
+    _server.run(ssl_key_file, ssl_cert_file, redirect_to_https_from_port)
 
 
-def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https=True):
+def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https_from_port: int = None):
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
     try:
         logger.verbose = debug
         args = tuple([superpath, debug, ssl_key_file,
-                      ssl_cert_file, redirect_to_https])
+                      ssl_cert_file, redirect_to_https_from_port])
         server = multiprocessing.Process(
             target=_start_server, args=args)
         if mail_active:

@@ -140,7 +140,6 @@ def test_response_6():
         c = 3.14
     r = Response(body=[MockupClass(), MockupClass()])
     d = {"a": True, "b": 10, "c": 3.14}
-    print(r.obj)
     assert r.obj == [d, d]
 
 

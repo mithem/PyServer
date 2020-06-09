@@ -28,7 +28,7 @@ console_index = r"""<!DOCTYPE html>
         }
       }
     </style>
-    <script src="SUPERPATH/console/static/js/main.js"/>
+    <script src="SUPERPATH/console/static/js/main.js"></script>
     <script>
       function renewLogin(){
         var req = new XMLHttpRequest();
@@ -573,6 +573,7 @@ console_endpoints = r"""<!DOCTYPE html>
         req.onreadystatechange = () => {
           if (req.readyState === 4) {
             if (req.status === 200) {
+              console.info(JSON.parse(req.responseText));
               drawEndpoints(JSON.parse(req.responseText));
             } else {
               handleResponse(req);
@@ -591,8 +592,9 @@ console_endpoints = r"""<!DOCTYPE html>
     <div class="card">
       <span>actions</span>
       <div class="actions">
-        <button onclick="newEndpoint()">new</button>
-        <button onclick="deleteEndpoint()">delete</button>
+        <button onclick="newEndpoint();">new</button>
+        <button onclick="deleteEndpoint();">delete</button>
+        <button onclick="loadEndpoints();">refresh</button
       </div>
     </div>
     <div id="endpointsContainer"></div>
@@ -704,6 +706,7 @@ console_statistics = r"""<!DOCTYPE html>
       <span>actions</span>
       <div class="actions">
         <button onclick="resetStatistics()">reset</button>
+        <button onclick="loadStats();">refresh</button>
       </div>
     </div>
     <div class="card" id="statsContainer">

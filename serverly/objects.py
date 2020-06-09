@@ -209,6 +209,7 @@ class StaticSite:
     def __init__(self, path: str, file_path: str):
         check_relative_path(path)
         self.file_path = check_relative_file_path(file_path)
+        path = path.replace("//", "/")
         if path[0] != "^":
             path = "^" + path
         if path[-1] != "$":
@@ -255,7 +256,6 @@ class Resource:
 
     def use(self):
         """register endpoints specified in Resource attributes"""
-        import serverly
         for k, v in self.__map__.items():
             try:
                 subclass = issubclass(v, Resource)
@@ -271,16 +271,17 @@ class Resource:
             if callable(v):
                 try:
                     serverly.register_function(
-                        k[0], (self.__path__ + k[1]).replace("//", "/"), v)
+                        k[0], self.__path__ + k[1], v)
                 except Exception as e:
                     serverly.logger.handle_exception(e)
             elif type(v) == serverly.StaticSite:
                 serverly._sitemap.register_site(
                     k[0], v, self.__path__ + k[1][1:])
             elif type(v) == str:
-                new_path = (self.__path__ + k[1]).replace("//", "/")
+                new_path = self.__path__ + k[1]
                 s = serverly.StaticSite(new_path, v)
-                serverly._sitemap.register_site(k[0], s, new_path)
+                serverly._sitemap.register_site(
+                    k[0], s, new_path.replace("//", "/"))
         serverly.logger.context = "registration"
         serverly.logger.success(
             f"Registered Resource '{type(self).__name__}' for base path '{self.__path__}'.", False)

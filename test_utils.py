@@ -154,7 +154,6 @@ def test_get_http_method_type():
     for i in false_ones:
         with pytest.raises(ValueError):
             get_http_method_type(i)
-            print(i)
 
     for k, v in good_ones.items():
         assert get_http_method_type(k) == v
