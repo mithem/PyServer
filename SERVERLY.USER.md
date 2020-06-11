@@ -208,7 +208,7 @@ Delete all users in the database permanently.
 
 Serverly comes with a builtin standard API for user management. You just have to tell it where your endpoint should go.
 
-To use it, just call the `use`-method and specify `function: str`, `method: str` and `path: str`. You of course have to `import serverly.user.api`. The following functions (of user-management) are supported:
+To use it, just call the `use`-method and specify `function: str`, `method: str` and `path: str`. You of course have to `import serverly.user.api`. The following functions (of user-management) are supported (and many more, see docstrings):
 
 - authenticate
 - change
@@ -225,6 +225,8 @@ Example:
 Voilà, serverly now listens on the POST endpoint 'api/register'!
 
 Documententation of the standard API, what it accepts, what it returns, etc. is available on [Postman](https://documenter.getpostman.com/view/10720102/Szf549XF?version=latest)
+
+Also, if you have a Mac (or Hackintosh) and an iOS / iPadOS device, you can check out the following repo for an app that offers a basic UI for the /console (overview) page.
 
 ## MailManager
 
