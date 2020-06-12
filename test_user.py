@@ -2,6 +2,7 @@ import base64
 import datetime
 import hashlib
 import os
+import re
 import urllib.parse as parse
 import warnings
 from typing import Union
@@ -18,6 +19,7 @@ print("SERVERLY VERSION v" + serverly.version)
 
 FILENAME = "test_user.py.db"
 database_collision = "serverly_users.db" in os.listdir()
+valid_bearer_token: str = None
 
 try:
     os.remove(FILENAME)
@@ -163,7 +165,7 @@ def test_clean_user_object_3():
 # auth tests
 
 
-def g(auth_type: str, auth_data: Union[tuple, str], b64_encode=False, alternate=False):
+def g(auth_type: str, auth_data: Union[tuple, str], b64_encode=False):
     if auth_data != None:
         auth_header_value = auth_type + " "
         if type(auth_data) == tuple:
@@ -173,21 +175,25 @@ def g(auth_type: str, auth_data: Union[tuple, str], b64_encode=False, alternate=
         else:
             auth_header_value += str(base64.b64encode(
                 bytes(auth_data, "utf-8")), "utf-8")
-        key = "authentication" if alternate else "authorization"
-        h = {key: auth_header_value}
+        h = {"authorization": auth_header_value}
     else:
         h = {}
     return Request("get", parse.urlparse("/hello"), h, "No real body", ("localhost", 2020))
 
 
 def compare(r1: Response, r2: Response):
+    print("r1:", r1.body)
+    print("r2:", r2.body)
     assert r1.code == r2.code
     assert r1.headers == r2.headers
-    assert r1.body == r2.body
+    assert bool(re.match(r2.body, r1.body))
 
 
 invalid_auth = Response(
     401, {"content-type": "text/plain"}, "Unauthorized.")
+
+user_not_found = Response(
+    404, {"content-type": "text/plain"}, "^User \'[\w]+\' not found.$")
 
 
 def no_auth(auth_type: str):
@@ -203,12 +209,39 @@ def test_basic_auth():
         assert req.user.email == u.email
         assert req.user.salt == u.salt
     success(g("basic", ("temporary", "temporary"), True))
-    success(g("basic", ("temporary", "temporary"), True, True))
 
-    r1 = success(g("basic", ("temporary", "invalid"), True))
-    r2 = success(g("basic", ("temporary", "invalid"), True, True))
-    compare(r1, invalid_auth)
-    compare(r2, invalid_auth)
+    r = success(g("basic", ("temporary", "invalid"), True))
+    compare(r, invalid_auth)
 
     r = success(g("basic", None))
     compare(r, no_auth("basic"))
+
+    r = success(g("basic", ("invalid", "unimportant"), True))
+    compare(r, user_not_found)
+
+    r = success(g("bearer", "hellothere"))
+    compare(r, invalid_auth)
+
+    r = success(g(None, None))
+    compare(r, no_auth("basic"))
+
+
+def test_bearer_auth():
+    valid_bearer_token = auth.get_new_token("temporary").value
+    @auth.bearer_auth("")
+    def success(req: Request):
+        u = serverly.user.get("temporary")
+        assert req.user.username == u.username
+        assert req.user.email == u.email
+        assert req.user.salt == u.salt
+
+    success(g("bearer", valid_bearer_token))
+
+    r = success(g("bearer", "someinvalidtokenstr"))
+    compare(r, invalid_auth)
+
+    r = success(g("basic", ("temporary", "temporary"), True))
+    compare(r, no_auth("bearer"))
+
+    r = success(g(None, None))
+    compare(r, no_auth("bearer"))

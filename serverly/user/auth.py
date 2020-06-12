@@ -39,7 +39,6 @@ def basic_auth(func):
                 serverly.user.authenticate(
                     request.user_cred[0], request.user_cred[1], True, require_verified)
             else:
-                # Don't wanna have too many exc
                 raise NotAuthorizedError("Not authenticated.")
         except (AttributeError, NotAuthorizedError) as e:
             s = {"e": str(e)}
@@ -47,7 +46,11 @@ def basic_auth(func):
                 header = {"www-authenticate": "basic"}
             else:
                 header = {}
-                s = {**serverly.user.get(request.user_cred[0]).to_dict(), **s}
+                try:
+                    s = {
+                        **serverly.user.get(request.user_cred[0]).to_dict(), **s}
+                except:
+                    s = {}
             temp = string.Template(UNAUTHORIZED_TMPLT)
             msg = temp.safe_substitute(s)
             return Response(401, header, msg)
@@ -73,7 +76,7 @@ def bearer_auth(scope: Union[str, list], expired=True):
         def wrapper(request, *args, **kwargs):
             try:
                 if request.auth_type == None:
-                    return Response(401, {"www-authenticate": "bearer"})
+                    return Response(401, {"www-authenticate": "bearer"}, UNAUTHORIZED_TMPLT)
                 if request.auth_type.lower() == "bearer":
                     token = request.user_cred
                     if token == None or token == "":
@@ -82,11 +85,9 @@ def bearer_auth(scope: Union[str, list], expired=True):
                         token, True, expired, scope)
                     return func(request, *args, **kwargs)
                 else:
-                    return Response(401, {"www-authenticate": "bearer"})
-            except (AttributeError, NotAuthorizedError) as e:
-                return Response(401, body="Invalid bearer token.")
-            except UserNotFoundError as e:
-                return Response(401, body="Invalid bearer token.")
+                    return Response(401, {"www-authenticate": "bearer"}, UNAUTHORIZED_TMPLT)
+            except (AttributeError, NotAuthorizedError, UserNotFoundError) as e:
+                return Response(401, body=UNAUTHORIZED_TMPLT)
             except Exception as e:
                 serverly.logger.handle_exception(e)
                 return Response(500, body=f"We're sorry, it seems like serverly, the framework behind this server has made an error. Please advise the administrator about incorrect behaviour in the 'bearer_auth'-decorator. The specific error message is: {str(e)}")
@@ -125,6 +126,8 @@ def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Unio
                 BearerToken).filter_by(value=bearer_token).first()
         else:
             token: BearerToken = bearer_token
+        if token == None:
+            return False
         if token.expires == None:
             expired = False
         b = token.expires > datetime.datetime.now() if expired else True
