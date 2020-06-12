@@ -136,29 +136,33 @@ class Request(CommunicationObject):
         self.address = address
 
         self.authenticated = False
-        for key, value in self.headers.items():
-            kl = key.lower()
-            if kl == "authentication" or kl == "authorization":
-                auth = tuple(value.split(" "))
-                self.auth_type = auth[0].lower()
-                user_cred = auth[1]
-                if self.auth_type == "basic":
-                    try:
-                        decoded = str(base64.b64decode(user_cred), "utf-8")
-                        self.user_cred = tuple(decoded.split(":"))
+        try:
+            for key, value in self.headers.items():
+                kl = key.lower()
+                if kl == "authentication" or kl == "authorization":
+                    auth = tuple(value.split(" "))
+                    self.auth_type = auth[0].lower()
+                    user_cred = auth[1]
+                    if self.auth_type == "basic":
+                        try:
+                            decoded = str(base64.b64decode(user_cred), "utf-8")
+                            self.user_cred = tuple(decoded.split(":"))
+                            self.authenticated = True
+                        except UnicodeDecodeError as e:
+                            serverly.logger.handle_exception(e)
+                            break
+                    elif self.auth_type == "bearer":
+                        self.user_cred = user_cred
                         self.authenticated = True
-                    except UnicodeDecodeError as e:
-                        serverly.logger.handle_exception(e)
-                        break
-                elif self.auth_type == "bearer":
-                    self.user_cred = user_cred
-                    self.authenticated = True
-                else:
-                    try:
-                        raise Warning(
-                            "Requested auth method not supported. Expected basic or bearer.")
-                    except Warning as e:
-                        serverly.logger.show_warning(e)
+                    else:
+                        try:
+                            raise Warning(
+                                "Requested auth method not supported. Expected basic or bearer.")
+                        except Warning as e:
+                            serverly.logger.show_warning(e)
+        except Exception as e:
+            serverly.logger.handle_exception(e)
+            self._set_auth_none()
         if not self.authenticated:
             self._set_auth_none()
 
@@ -188,9 +192,12 @@ class Response(CommunicationObject):
     """
 
     def __init__(self, code: int = 200, headers: dict = {}, body: Union[str, dict, list] = "", bandwidth: int = None):
-        super().__init__(headers, body)
-        self.code = code
-        self.bandwidth = bandwidth
+        try:
+            super().__init__(headers, body)
+            self.code = code
+            self.bandwidth = bandwidth
+        except Exception as e:
+            serverly.logger.handle_exception(e)
 
     def __str__(self):
         return f"Responding to request with a body-length of {str(len(self.body))} and {str(len(self.headers))} headers"
@@ -271,7 +278,7 @@ class Resource:
             if callable(v):
                 try:
                     serverly.register_function(
-                        k[0], self.__path__ + k[1], v)
+                        k[0], (self.__path__ + k[1]).replace("//", "/"), v)
                 except Exception as e:
                     serverly.logger.handle_exception(e)
             elif type(v) == serverly.StaticSite:

@@ -18,3 +18,4 @@ reset.py
 Dockerfile
 console/
 *.pem
+CA-signed_certs/

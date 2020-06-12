@@ -472,7 +472,9 @@ def _start_server(superpath: str, debug=False, ssl_key_file: str = None, ssl_cer
 
 
 def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: str = None, ssl_cert_file: str = None, redirect_to_https_from_port: int = None):
-    """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers."""
+    """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers.
+
+    Note: this function will not be 'alive' over the lifespan of the server, it finishes mid-startup."""
     try:
         logger.verbose = debug
         args = tuple([superpath, debug, ssl_key_file,

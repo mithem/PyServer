@@ -44,7 +44,7 @@ def new_statistic(function: str, time: float):
 
 
 def print_stats():
-    """Print statistics saved in this module."""
+    """Print statistics saved in this module and save them to disk."""
     if overall_performance["len"] > 0:
         print("\n\nCalculation times (ms):\n")
         print(tabulate([overall_performance.values()],

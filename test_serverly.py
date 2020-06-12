@@ -20,6 +20,7 @@ try:
 except requests.exceptions.ConnectionError as e:
     if "Connection refused" in str(e):
         address_available = True
+        print("avail")
 except:
     pass
 

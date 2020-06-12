@@ -218,6 +218,8 @@ def test_resource():
                 ("GET", "/d"): "test_serverly.py",
                 "/mini": Mini
             }
+            pass
+            pass
 
     Test().use()
 

@@ -1,13 +1,18 @@
+import base64
 import datetime
 import hashlib
 import os
+import urllib.parse as parse
 import warnings
+from typing import Union
 
 import pytest
 import serverly
 import serverly.user as user
+import serverly.user.auth as auth
 import serverly.utils
 import sqlalchemy
+from serverly.objects import Request, Response
 
 print("SERVERLY VERSION v" + serverly.version)
 
@@ -35,7 +40,7 @@ def test_setup():
     assert user.salting == 1
 
     user.setup(filename=FILENAME, user_columns={
-               "first_name": str, "email": str, "bearer_token": str, "role": (str, "normal")})
+               "first_name": str, "email": str, "role": (str, "normal")})
 
     assert type(user._engine) == sqlalchemy.engine.base.Engine
     assert type(user._Session) == sqlalchemy.orm.session.sessionmaker
@@ -154,3 +159,56 @@ def test_clean_user_object_3():
 
     for i in a:
         assert i in n
+
+# auth tests
+
+
+def g(auth_type: str, auth_data: Union[tuple, str], b64_encode=False, alternate=False):
+    if auth_data != None:
+        auth_header_value = auth_type + " "
+        if type(auth_data) == tuple:
+            auth_data = auth_data[0] + ":" + auth_data[1]
+        if b64_encode == False:
+            auth_header_value += auth_data
+        else:
+            auth_header_value += str(base64.b64encode(
+                bytes(auth_data, "utf-8")), "utf-8")
+        key = "authentication" if alternate else "authorization"
+        h = {key: auth_header_value}
+    else:
+        h = {}
+    return Request("get", parse.urlparse("/hello"), h, "No real body", ("localhost", 2020))
+
+
+def compare(r1: Response, r2: Response):
+    assert r1.code == r2.code
+    assert r1.headers == r2.headers
+    assert r1.body == r2.body
+
+
+invalid_auth = Response(
+    401, {"content-type": "text/plain"}, "Unauthorized.")
+
+
+def no_auth(auth_type: str):
+    return Response(401, {"content-type": "text/plain",
+                          "www-authenticate": auth_type}, "Unauthorized.")
+
+
+def test_basic_auth():
+    @auth.basic_auth
+    def success(req: Request):
+        u = serverly.user.get("temporary")
+        assert req.user.username == u.username
+        assert req.user.email == u.email
+        assert req.user.salt == u.salt
+    success(g("basic", ("temporary", "temporary"), True))
+    success(g("basic", ("temporary", "temporary"), True, True))
+
+    r1 = success(g("basic", ("temporary", "invalid"), True))
+    r2 = success(g("basic", ("temporary", "invalid"), True, True))
+    compare(r1, invalid_auth)
+    compare(r2, invalid_auth)
+
+    r = success(g("basic", None))
+    compare(r, no_auth("basic"))

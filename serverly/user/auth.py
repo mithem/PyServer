@@ -44,7 +44,7 @@ def basic_auth(func):
         except (AttributeError, NotAuthorizedError) as e:
             s = {"e": str(e)}
             if e.__class__ == AttributeError:
-                header = {"WWW-Authenticate": "Basic"}
+                header = {"www-authenticate": "basic"}
             else:
                 header = {}
                 s = {**serverly.user.get(request.user_cred[0]).to_dict(), **s}
@@ -73,7 +73,7 @@ def bearer_auth(scope: Union[str, list], expired=True):
         def wrapper(request, *args, **kwargs):
             try:
                 if request.auth_type == None:
-                    return Response(401, {"WWW-Authenticate": "Bearer"})
+                    return Response(401, {"www-authenticate": "bearer"})
                 if request.auth_type.lower() == "bearer":
                     token = request.user_cred
                     if token == None or token == "":
@@ -82,7 +82,7 @@ def bearer_auth(scope: Union[str, list], expired=True):
                         token, True, expired, scope)
                     return func(request, *args, **kwargs)
                 else:
-                    return Response(401, {"WWW-Authenticate": "Bearer"})
+                    return Response(401, {"www-authenticate": "bearer"})
             except (AttributeError, NotAuthorizedError) as e:
                 return Response(401, body="Invalid bearer token.")
             except UserNotFoundError as e:
@@ -107,7 +107,7 @@ def session_auth(func):
             if last_session.end + datetime.timedelta(seconds=session_renew_treshold) < datetime.datetime.now():
                 return Response(401, body=unauth_res)
         except AttributeError:
-            return Response(401, {"WWW-Authenticate": "Bearer"}, unauth_res)
+            return Response(401, {"www-authenticate": "Bearer"}, unauth_res)
         except Exception as e:
             serverly.logger.handle_exception(e)
             return Response(500, body=str(e))
