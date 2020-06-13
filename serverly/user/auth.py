@@ -18,10 +18,10 @@ from functools import wraps
 from typing import Union
 
 import serverly
+import serverly.user.session
 import serverly.utils
 from serverly.objects import Request, Response
-from serverly.user import (BearerToken, User, require_verified,
-                           session_renew_treshold)
+from serverly.user import (BearerToken, User, require_verified)
 from serverly.user.err import NotAuthorizedError, UserNotFoundError
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
@@ -80,7 +80,7 @@ def bearer_auth(scope: Union[str, list], expired=True):
                 if request.auth_type.lower() == "bearer":
                     token = request.user_cred
                     if token == None or token == "":
-                        raise NotAuthorizedError("Not authenticated.")
+                        return Response(401, {"www-authenticate": "bearer"}, UNAUTHORIZED_TMPLT)
                     request.user = serverly.user.get_by_token(
                         token, True, expired, scope)
                     return func(request, *args, **kwargs)
@@ -95,25 +95,28 @@ def bearer_auth(scope: Union[str, list], expired=True):
     return my_wrap
 
 
-def session_auth(func):
-    """Use this decorator to authenticate the user by the latest session. Requires the use of `bearer_token`s(you don't need to use the decorator but user objects need to have the `bearer_token`- attribute)."""
-    @wraps(func)
-    @bearer_auth
-    def wrapper(request: Request, *args, **kwargs):
-        unauth_res = string.Template(
-            UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict())
-        try:
-            last_session = serverly.user.get_last_session(
-                request.user.username)
-            if last_session.end + datetime.timedelta(seconds=session_renew_treshold) < datetime.datetime.now():
-                return Response(401, body=unauth_res)
-        except AttributeError:
-            return Response(401, {"www-authenticate": "Bearer"}, unauth_res)
-        except Exception as e:
-            serverly.logger.handle_exception(e)
-            return Response(500, body=str(e))
-        return func(request, *args, **kwargs)
-    return wrapper
+def session_auth(scope: Union[str, list]):
+    """Use this decorator to authenticate the user by the latest session. Uses `bearer_auth`."""
+    def my_wrap(func):
+        @wraps(func)
+        @bearer_auth(scope)
+        def wrapper(request: Request, *args, **kwargs):
+            unauth_res = string.Template(
+                UNAUTHORIZED_TMPLT).safe_substitute(**request.user.to_dict())
+            try:
+                last_session = serverly.user.session.get_last_session(
+                    request.user.username)
+                print(last_session.end)
+                d = datetime.datetime.now()
+                print(d)
+                if last_session.end + datetime.timedelta(seconds=serverly.user.session_renew_threshold) < d:
+                    return Response(401, body=unauth_res)
+            except Exception as e:
+                serverly.logger.handle_exception(e)
+                return Response(500, body=str(e))
+            return func(request, *args, **kwargs)
+        return wrapper
+    return my_wrap
 
 
 @serverly.user._setup_required
@@ -135,7 +138,7 @@ def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Unio
             scope = [scope]
         scopes = serverly.utils.parse_scope_list(token.scope)
         c = True
-        if scope != [""]:
+        if scope != [""] and scope != "" and scope != None:
             try:
                 for s in scope:
                     assert s in scopes
@@ -202,3 +205,20 @@ def get_new_token(username: str, scope: Union[str, list] = [], expires: Union[da
     except Exception as e:
         serverly.logger.handle_exception(e)
         return None
+
+
+@serverly.user._setup_required
+def get_all_tokens():
+    session = serverly.user._Session()
+    result = session.query(BearerToken).all()
+    session.close()
+    return result
+
+
+@serverly.user._setup_required
+def clear_all_tokens():
+    """Delete ALL tokens. Be careful, cause you might break a lot of logins."""
+    session = serverly.user._Session()
+    session.query(BearerToken).delete()
+    session.commit()
+    session.close()

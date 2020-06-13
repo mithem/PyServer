@@ -364,7 +364,7 @@ def my_page(req):
 
 ### session_auth()
 
-Special authorization using Bearer tokens (see [bearer_auth()](#bearer_auth); therefore same requirements and token generation). Uses sessions and `session_renew_treshold` to decide whether to log in a user (assuming their bearer token is valid). If the last session of the user, which means that they where authenticated then is less than `session_renew_treshold` in the past, they are authorized.
+Special authorization using Bearer tokens (see [bearer_auth()](#bearer_auth); therefore same requirements and token generation). Uses sessions and `session_renew_threshold` to decide whether to log in a user (assuming their bearer token is valid). If the last session of the user, which means that they where authenticated then is less than `session_renew_threshold` in the past, they are authorized.
 
 Example:
 

@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import os
 import re
+import time
 import urllib.parse as parse
 import warnings
 from typing import Union
@@ -11,6 +12,7 @@ import pytest
 import serverly
 import serverly.user as user
 import serverly.user.auth as auth
+import serverly.user.session
 import serverly.utils
 import sqlalchemy
 from serverly.objects import Request, Response
@@ -19,7 +21,8 @@ print("SERVERLY VERSION v" + serverly.version)
 
 FILENAME = "test_user.py.db"
 database_collision = "serverly_users.db" in os.listdir()
-valid_bearer_token: str = None
+serverly.user.session_renew_threshold = 1
+
 
 try:
     os.remove(FILENAME)
@@ -189,6 +192,8 @@ def compare(r1: Response, r2: Response):
     assert bool(re.match(r2.body, r1.body))
 
 
+valid = Response(body="success!")
+
 invalid_auth = Response(
     401, {"content-type": "text/plain"}, "Unauthorized.")
 
@@ -208,7 +213,10 @@ def test_basic_auth():
         assert req.user.username == u.username
         assert req.user.email == u.email
         assert req.user.salt == u.salt
-    success(g("basic", ("temporary", "temporary"), True))
+        return valid
+
+    r = success(g("basic", ("temporary", "temporary"), True))
+    compare(r, valid)
 
     r = success(g("basic", ("temporary", "invalid"), True))
     compare(r, invalid_auth)
@@ -234,8 +242,10 @@ def test_bearer_auth():
         assert req.user.username == u.username
         assert req.user.email == u.email
         assert req.user.salt == u.salt
+        return valid
 
-    success(g("bearer", valid_bearer_token))
+    r = success(g("bearer", valid_bearer_token))
+    compare(r, valid)
 
     r = success(g("bearer", "someinvalidtokenstr"))
     compare(r, invalid_auth)
@@ -245,3 +255,66 @@ def test_bearer_auth():
 
     r = success(g(None, None))
     compare(r, no_auth("bearer"))
+
+    r = success(g("bearer", None))
+    compare(r, no_auth("bearer"))
+
+    r = success(g("bearer", ""))
+    compare(r, no_auth("bearer"))
+
+
+def test_session_auth():
+    valid_bearer_token = auth.get_new_token("temporary").value
+    serverly.user.session.new_activity("temporary", ("localhost", 8080))
+    @auth.session_auth("")
+    def success(req: Request):
+        u = serverly.user.get("temporary")
+        assert req.user.username == u.username
+        assert req, user.email == u.email
+        assert req.user.salt == u.salt
+        return valid
+
+    r = success(g("bearer", valid_bearer_token))
+    compare(r, valid)
+
+    time.sleep(serverly.user.session_renew_threshold * 2)
+
+    r = success(g("bearer", valid_bearer_token))
+    compare(r, invalid_auth)
+
+
+def test_valid_token():
+    wait = 0.1
+
+    d = datetime.datetime.now()
+    t = d + datetime.timedelta(seconds=wait)
+
+    token = auth.get_new_token("temporary")
+    assert auth.valid_token(token)
+    assert not auth.valid_token(token, scope="write")
+    assert auth.valid_token(token.value)
+
+    token = auth.get_new_token("temporary", "write")
+    assert auth.valid_token(token)
+    assert auth.valid_token(token, scope="write")
+    assert not auth.valid_token(token, scope="read")
+
+    token = auth.get_new_token("temporary", expires=t)
+    assert auth.valid_token(token)
+
+    time.sleep(wait)
+    assert not auth.valid_token(token)
+
+
+def test_clear_expired_tokens():
+    assert auth.clear_expired_tokens() == 1
+
+
+def test_get_tokens_by_user():
+    assert len(auth.get_tokens_by_user("temporary")) > 0
+
+
+def test_clear_all():
+    assert len(auth.get_all_tokens()) > 0
+    auth.clear_all_tokens()
+    assert len(auth.get_all_tokens()) == 0

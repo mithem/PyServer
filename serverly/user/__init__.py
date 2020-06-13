@@ -5,7 +5,7 @@ Configuration
 --
 Attribute | Description
 - | -
-session_renew_treshold = 60 | Number of seconds after which a new session will be created instead of increasing the end date (used by `serverly.user.session` and `serverly.user.auth`)
+session_renew_threshold = 60 | Number of seconds after which a new session will be created instead of increasing the end date (used by `serverly.user.session` and `serverly.user.auth`)
 
 """
 import datetime
@@ -25,7 +25,7 @@ from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
                         Interval, String)
 from sqlalchemy.ext.declarative import declarative_base
 
-session_renew_treshold = 60
+session_renew_threshold = 60
 
 _required_user_attrs = []
 _role_hierarchy = {}
