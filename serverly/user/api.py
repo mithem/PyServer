@@ -599,7 +599,25 @@ def _console_api_get_user(request: Request):
 @_check_to_use_sessions
 @requires_role("admin")
 def _console_api_users_get(request: Request):
-    return Response(body=serverly.user.get_all())
+    try:
+        d = parse.parse_qs(request.path.query)
+        attrs = d.get("attrs", d.get("attributes", [""]))[0].split(",")
+        users = serverly.user.get_all()
+        if attrs != [""]:
+            users = serverly.utils.clean_user_object(users, "id")
+            c = 0
+            u = []
+            for i in users:
+                u.append({})
+                for a in attrs:
+                    u[c][a] = i.get(a, None)
+                c += 1
+        else:
+            u = users
+        return Response(body=u)
+    except Exception as e:
+        serverly.logger.handle_exception(e)
+        return Response(body=str(e))
 
 
 @basic_auth
