@@ -10,7 +10,7 @@ from typing import Union
 import serverly
 from serverly.utils import (check_relative_file_path, check_relative_path,
                             get_http_method_type, guess_response_headers,
-                            is_json_serializable, lowercase_dict)
+                            is_json_serializable, lowercase_dict, clean_user_object)
 
 
 class DBObject:
@@ -96,8 +96,8 @@ class CommunicationObject:
                     obj = None
                 return a, obj
             elif issubclass(a.__class__, DBObject):
-                d = a.to_dict()
-                return jsonjson.dumps(d), d
+                b = clean_user_object(a)
+                return jsonjson.dumps(b), b
             else:
                 a.seek(0)
                 c = a.read()

@@ -41,7 +41,6 @@ def new_activity(username: str, address: tuple):
         new = Session()
         new.username = username
         new.start = n
-        print("renew treshold:", serverly.user.session_renew_threshold)
         new.end = n + \
             datetime.timedelta(seconds=serverly.user.session_renew_threshold)
         new.address = f"{address[0]}:{address[1]}"

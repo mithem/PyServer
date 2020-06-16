@@ -88,7 +88,7 @@ def clean_user_object(user_s, *allow):
         if type(u) != list:
             return u.to_dict(bad_attributes)
         else:
-            return [i.to_dict(bad_attributes) for i in u]
+            return [clean(i) for i in u]
 
     return clean(user_s)
 

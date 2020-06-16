@@ -6,6 +6,7 @@ import urllib.parse as parse
 
 import pytest
 import serverly
+import serverly.utils
 from serverly.objects import (DBObject, Redirect, Request, Resource, Response,
                               StaticSite)
 
@@ -84,16 +85,15 @@ def test_response_2():
     from serverly.user import User
     u = User()
     u.id = 1
+    u.email = "some@email.com"
     u.username = "oh yeah!"
     u.password = "totallyhashed"
     u.salt = "totallyrandom"
     res = Response(body=u)
 
     d = {
-        "id": 1,
-        "username": "oh yeah!",
-        "password": "totallyhashed",
-        "salt": "totallyrandom"
+        "email": "some@email.com",
+        "username": "oh yeah!"
     }
 
     assert res.headers["content-type"] == "application/json"
@@ -138,9 +138,26 @@ def test_response_6():
         a = True
         b = 10
         c = 3.14
-    r = Response(body=[MockupClass(), MockupClass()])
+    r = Response(body=[MockupClass() for _ in range(10)])
     d = {"a": True, "b": 10, "c": 3.14}
-    assert r.obj == [d, d]
+    assert r.obj == [d for _ in range(10)]
+
+
+def test_response_7():
+    class MockupClass(DBObject):
+        a = True
+        b = 10
+        c = 3.14
+        id = 99
+        password = "somepassword"
+        salt = "somesalt"
+
+    r = Response(body=MockupClass())
+    assert r.obj == serverly.utils.clean_user_object(MockupClass())
+
+    l = [MockupClass() for _ in range(10)]
+    r = Response(body=l)
+    assert r.obj == serverly.utils.clean_user_object(l)
 
 
 def test_redirect():

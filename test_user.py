@@ -15,7 +15,7 @@ import serverly.user.auth as auth
 import serverly.user.session
 import serverly.utils
 import sqlalchemy
-from serverly.objects import Request, Response
+from serverly.objects import Request, Response, DBObject
 
 print("SERVERLY VERSION v" + serverly.version)
 
@@ -144,6 +144,22 @@ def test_clean_user_object_2():
         for ba in bad_attributes:
             with pytest.raises(AttributeError):
                 getattr(u, ba)
+
+
+def test_clean_user_object_3():
+    class MockupClass(DBObject):
+        a = 10
+        b = True
+        c = 3.14
+        id = 99
+        password = "somepassword"
+        salt = "somesalt"
+
+    assert serverly.utils.clean_user_object(MockupClass()) == {
+        "a": 10, "b": True, "c": 3.14}
+
+    assert serverly.utils.clean_user_object([MockupClass() for _ in range(10)]) == [{
+        "a": 10, "b": True, "c": 3.14} for _ in range(10)]
 
 
 @pytest.mark.skipif("database_collision")

@@ -58,6 +58,7 @@ def use(function: str, method: str, path: str):
     - GET console.api.summary.statistics: Basic (API for getting a summary of the overall server statistics)
     - GET console.api.user.get: Basic (get user with id defined in query). Ex. /console/api/user/get?ids=1
     - PUT console.api.user.change_or_register: Basic (API endpoint for changing or registering users)
+    - GET console.api.users.get: Basic (get all users)
     - POS console.api.users.verify: Basic (verify all users with ids submitted in request body)
     - POS console.api.users.deverify: Basic (same as above but deverifying users)
     - POS console.api.users.verimail: Basic (send a confirmation mail to users with ids submitted in request body)
@@ -99,6 +100,7 @@ def use(function: str, method: str, path: str):
         "console.api.summary.statistics": _console_summary_statistics,
         "console.api.user.get": _console_api_get_user,
         "console.api.user.change_or_register": _console_api_change_or_create_user,
+        "console.api.users.get": _console_api_users_get,
         "console.api.users.verify": _console_api_verify_users,
         "console.api.users.deverify": _console_api_deverify_users,
         "console.api.users.verimail": _console_api_verimail,
@@ -109,7 +111,7 @@ def use(function: str, method: str, path: str):
         "console.api.endpoints.get": _console_api_endpoints_get,
         "console.api.statistics.get": _console_api_statistics_get,
         "console.api.statistics.reset": _console_api_statistics_reset,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_json: ('GET', '/console/api/summary.json'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_clear_expired_tokens: ('DELETE', '/console/api/cleartokens'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_json: ('GET', '/console/api/summary.json'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_users_get: ('GET', '/console/api/users.get'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_clear_expired_tokens: ('DELETE', '/console/api/cleartokens'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -591,6 +593,13 @@ def _console_api_get_user(request: Request):
     except Exception as e:
         serverly.logger.handle_exception(e)
         return Response(500, body=str(e))
+
+
+@basic_auth
+@_check_to_use_sessions
+@requires_role("admin")
+def _console_api_users_get(request: Request):
+    return Response(body=serverly.user.get_all())
 
 
 @basic_auth
