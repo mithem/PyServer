@@ -20,9 +20,9 @@ from typing import Union
 import serverly
 import serverly.user.session
 import serverly.utils
+from serverly.err import NotAuthorizedError, UserNotFoundError
 from serverly.objects import Request, Response
-from serverly.user import (BearerToken, User, require_verified)
-from serverly.user.err import NotAuthorizedError, UserNotFoundError
+from serverly.user import BearerToken, User, require_verified
 
 # use these to customize the response of built-in authentication functions like the basic_auth()-decorator
 USER_NOT_FOUND_TMPLT = "User $e"

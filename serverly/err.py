@@ -16,3 +16,7 @@ class MissingParameterError(Exception):
 
 class ConfigurationError(Exception):
     pass
+
+
+class UnsupportedHTTPMethod(Exception):
+    pass

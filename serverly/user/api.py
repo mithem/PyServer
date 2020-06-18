@@ -18,7 +18,7 @@ import serverly.user.mail
 import serverly.utils
 from serverly import error_response
 from serverly.objects import Redirect, Request, Response
-from serverly.user import err, requires_role
+from serverly.user import requires_role
 from serverly.user.auth import basic_auth, bearer_auth
 
 verify_mail = False
@@ -203,7 +203,7 @@ def _api_register(req: Request):  # cannot use _check_to_use_sessions as it need
     except (KeyError, AttributeError, TypeError) as e:
         serverly.logger.handle_exception(e)
         response = _RES_406
-    except err.UserAlreadyExistsError as e:
+    except serverly.err.UserAlreadyExistsError as e:
         response = Response(406, body=str(e))
     except Exception as e:
         serverly.logger.handle_exception(e)
@@ -585,7 +585,7 @@ def _console_api_get_user(request: Request):
         i = int(q["id"][0])
         u = serverly.user.get_by_id(i)
         return Response(body=serverly.utils.clean_user_object(u, "password", "id"))
-    except serverly.user.err.UserNotFoundError:
+    except serverly.err.UserNotFoundError:
         return Response(404, body="User not found.")
     except (KeyError, TypeError) as e:
         serverly.logger.handle_exception(e)
@@ -708,7 +708,7 @@ def _console_api_renew_login(request: Request):
         assert user.role == "admin"
         serverly.user.authenticate(user.username, request.user_cred[1], True)
         return Response()
-    except (AssertionError, serverly.user.err.UserNotFoundError, AttributeError, TypeError, serverly.user.err.NotAuthorizedError):
+    except (AssertionError, serverly.err.UserNotFoundError, AttributeError, TypeError, serverly.err.NotAuthorizedError):
         return Response(401, {"WWW-Authenticate": "Basic"})
     except Exception as e:
         serverly.logger.handle_exception(e)

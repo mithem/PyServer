@@ -17,9 +17,9 @@ from typing import Union
 
 import serverly
 import sqlalchemy
+from serverly.err import (ConfigurationError, NotAuthorizedError,
+                          UserAlreadyExistsError, UserNotFoundError)
 from serverly.objects import DBObject, Request, Response
-from serverly.user.err import (ConfigurationError, NotAuthorizedError,
-                               UserAlreadyExistsError, UserNotFoundError)
 from serverly.utils import get_scope_list, parse_scope_list, ranstr
 from sqlalchemy import (Binary, Boolean, Column, DateTime, Float, Integer,
                         Interval, String)

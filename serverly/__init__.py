@@ -99,8 +99,11 @@ async def _uvicorn_server(scope, receive, send):
                 else:
                     v = hl[1]
                 headers[str(hl[0], "utf-8")] = v
-            request = Request(scope["method"], parse.urlparse(full_url),
-                              headers, b, scope["client"])
+            try:
+                request = Request(scope["method"], parse.urlparse(full_url),
+                                  headers, b, scope["client"])
+            except serverly.err.UnsupportedHTTPMethod:
+                request = error_response(943)
             func, response = _sitemap.get_content(request)
             response_headers = []
             for k, v in response.headers.items():
@@ -552,3 +555,5 @@ register_error_response(
 register_error_response(404, "<html><p>404 - Page not found</p></html>")
 register_error_response(
     942, "<html><h3>502 - Bad Gateway.</h3><br />Sorry, there is an error with the function serving this site. Please advise the server administrator that the function for '{req.path.path}' is not returning a response object.</html>", "base")
+register_error_response(
+    943, "Sorry, but this HTTP-Method is unsupported. Supported are GET, POST, PUT & DELETE.", "base")
