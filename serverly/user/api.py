@@ -750,9 +750,22 @@ def _console_api_clear_expired_tokens(request: Request):
 @_check_to_use_sessions
 @requires_role("admin")
 def _console_api_statistics_get(request: Request):
-    d = serverly.statistics.endpoint_performance
-    d["overall"] = serverly.statistics.overall_performance
-    return Response(body=d)
+    a = parse.parse_qs(request.path.query).get("list", [False])[0]
+    try:
+        a = int(a)
+    except:
+        pass
+    if bool(a):
+        l = []
+        for k, v in serverly.statistics.endpoint_performance.items():
+            l.append({"function": k, **v})
+        l.append({"function": "overall", **
+                  serverly.statistics.overall_performance})
+        return Response(body=l)
+    else:
+        d = serverly.statistics.endpoint_performance
+        d["overall"] = serverly.statistics.overall_performance
+        return Response(body=d)
 
 
 @basic_auth
