@@ -191,6 +191,7 @@ def _https_redirect_server_start(port: int):
             logger.show_warning(w)
         return None
     _https_redirect_url = https_redirect_url
+    _update_status("startup.https-red-server-starting")
     uvicorn.run(_https_redirect_server,
                 host=address[0], port=port, lifespan="off", log_level="error")
 
@@ -201,6 +202,7 @@ class Server:
         self.description = description
         self.server_address = get_server_address(server_address)
         self.cleanup_function = None
+        self.redirect_server_port: int = None
         logger.context = "startup"
         logger.success("Server initialized", False)
 
@@ -212,9 +214,10 @@ class Server:
         log_level = "info" if _sitemap.debug else "warning"
         self.ssl_key_file = ssl_key_file
         self.ssl_cert_file = ssl_cert_file
-        if redirect_to_https_from_port != None:
+        self.redirect_server_port = redirect_to_https_from_port
+        if self.redirect_server_port != None:
             self.redirect_server = multiprocessing.Process(
-                target=_https_redirect_server_start, args=tuple([redirect_to_https_from_port]))
+                target=_https_redirect_server_start, args=tuple([self.redirect_server_port]))
             self.redirect_server.start()
         kwargs = {}
         if ssl_key_file != None:
@@ -252,6 +255,10 @@ def _update_status(new_status: str):
             f"Server started {prefix}://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
     elif new_status == "startup.failed" or new_status == "shutdown":
         _server.close()
+    elif new_status == "startup.https-red-server-starting":
+        logger.context = "startup"
+        logger.success(
+            f"HTTPS-Redirect-server starting on http://{_server.redirect_server_port}", _sitemap.debug)
     else:
         logger.warning(Exception(
             f"_update_status() was called with an invalid parameter 'new_status' of '{new_status}' (type {type(new_status)})"))
