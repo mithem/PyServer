@@ -470,15 +470,29 @@ def _console_summary_statistics(request: Request):
 @_check_to_use_sessions
 @requires_role("admin")
 def _console_api_endpoints_get(request: Request):
-    new = {}
-    for k, v in serverly._sitemap.methods.items():
-        new[k] = {}
-        for path, func in v.items():
-            if callable(func):
-                new[k][path] = func.__name__
-            else:
-                new[k]["^" + path + "$"] = type(func).__name__ + \
-                    " (" + func.file_path + ")"
+    def static_site_name(site):
+        return type(func).__name__ + \
+            " (" + func.file_path + ")"
+    q = parse.parse_qs(request.path.query)
+    if bool(q.get("list", q.get("obj", False))):
+        new = []
+        for method, endpoints in serverly._sitemap.methods.items():
+            for path, func in endpoints.items():
+                if callable(func):
+                    new.append(
+                        {"method": method, "path": path, "name": func.__name__})
+                else:
+                    new.append({"method": method, "path": path,
+                                "name": static_site_name(func)})
+    else:
+        new = {}
+        for k, v in serverly._sitemap.methods.items():
+            new[k] = {}
+            for path, func in v.items():
+                if callable(func):
+                    new[k][path] = func.__name__
+                else:
+                    new[k]["^" + path + "$"] = static_site_name(func)
     return Response(body=new)
 
 
