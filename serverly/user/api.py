@@ -50,6 +50,8 @@ def use(function: str, method: str, path: str):
     - GET console.users.change_or_register: Basic (Allows admins to change or register users on one page)
     - GET console.endpoints: Basic (endpoints overview)
     - GET console.statistics: Basic (endpoints overview)
+    - GET console.api.root-token: None (get bearer token to create root user if no one is found in db)
+    - POS console.api.create-root-user: Bearer (create a root user authorized by bearer token from console.api.root-token)
     - POS console.api.endpoint.new: Basic (register a new endpoint)
     - DEL console.api.endpoint.del: Basic (delete existing endpoint identified by method & path)
     - GET console.api.summary.json: Basic (JSON summary of all summary endpoints)
@@ -92,6 +94,8 @@ def use(function: str, method: str, path: str):
         "console.users.change_or_register": _console_change_or_create_user,
         "console.endpoints": _console_endpoints,
         "console.statistics": _console_statistics,
+        "console.api.root-token": _console_api_get_root_token,
+        "console.api.create-root-user": _console_api_create_root_user,
         "console.api.endpoint.new": _console_api_endpoint_new,
         "console.api.endpoint.del": _console_api_endpoint_delete,
         "console.api.summary.json": _console_summary_json,
@@ -111,7 +115,7 @@ def use(function: str, method: str, path: str):
         "console.api.endpoints.get": _console_api_endpoints_get,
         "console.api.statistics.get": _console_api_statistics_get,
         "console.api.statistics.reset": _console_api_statistics_reset,
-        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_json: ('GET', '/console/api/summary.json'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_users_get: ('GET', '/console/api/users.get'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_clear_expired_tokens: ('DELETE', '/console/api/cleartokens'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
+        "console.all": {_console_index: ('GET', '/console/?'), _console_users: ('GET', '/console/users/?'), _console_change_or_create_user: ('GET', '/console/changeorcreateuser'), _console_endpoints: ('GET', '/console/endpoints/?'), _console_statistics: ('GET', '/console/statistics'), _console_api_get_root_token: ('GET', '/console/api/root/token'), _console_api_create_root_user: ('POST', '/console/api/root/create'), _console_api_endpoint_new: ('POST', '/console/api/endpoint.new'), _console_api_endpoint_delete: ('DELETE', '/console/api/endpoint.del'), _console_summary_json: ('GET', '/console/api/summary.json'), _console_summary_users: ('GET', '/console/api/summary.users'), _console_summary_endpoints: ('GET', '/console/api/summary.endpoints'), _console_summary_statistics: ('GET', '/console/api/summary.statistics'), _console_api_endpoints_get: ('GET', '/console/api/endpoints'), _console_api_get_user: ('GET', '/console/api/user/get'), _console_api_change_or_create_user: ('PUT', '/console/api/changeorcreateuser'), _console_api_users_get: ('GET', '/console/api/users.get'), _console_api_verify_users: ('POST', '/console/api/users/verify'), _console_api_deverify_users: ('POST', '/console/api/users/deverify'), _console_api_verimail: ('POST', '/console/api/users/verimail'), _console_api_delete_users: ('DELETE', '/console/api/users/delete'), _console_api_reset_password: ('DELETE', '/console/api/users/resetpassword'), _console_api_renew_login: ('POST', '/console/api/renewlogin'), _console_api_clear_expired_tokens: ('DELETE', '/console/api/cleartokens'), _console_api_statistics_get: ('GET', '/console/api/statistics'), _console_api_statistics_reset: ('DELETE', '/console/api/statistics')}
     }
     if not function.lower() in supported_funcs.keys():
         raise ValueError(
@@ -304,13 +308,7 @@ def _console_index(request: Request):
         content = _get_content(serverly.default_sites.console_index)
         return Response(body=content)
 
-    admin = False
-    users = serverly.user.get_all()
-    for u in users:
-        if u.role == "admin":
-            admin = True
-
-    if admin:
+    if serverly.user.has_role("admin"):
         res = _console_api_renew_login(request)
         if res.code == 200:
             return regular()
@@ -795,3 +793,31 @@ def _console_api_statistics_get(request: Request):
 def _console_api_statistics_reset(request: Request):
     serverly.statistics.reset()
     return Response(body="Reset statistics.")
+
+
+def _console_api_get_root_token(request: Request):
+    if serverly.user.has_role("admin"):
+        body = {"code": 401, "message": "There is an admin user."}
+    else:
+        # is this a security issue? Probably?
+        serverly.user.register("root", "myrandomstring",
+                               role="admin")
+        body = {"code": 200, "token": serverly.user.auth.get_new_token(
+            "root", "create-root-user", expires=datetime.datetime.now() + datetime.timedelta(minutes=2)).value}
+    return Response(body["code"], body=body)
+
+
+@bearer_auth("create-root-user")
+@_check_to_use_sessions
+def _console_api_create_root_user(request: Request):
+    try:
+        if request.obj == None:
+            raise KeyError
+        serverly.user.change("root", password=request.obj["password"])
+        for token in serverly.user.auth.get_tokens_by_user("root"):
+            serverly.user.auth.clear_token(token)
+        return Response(body="Created root user successfully.")
+    except KeyError:
+        return Response(406, body="Expected password.")
+    except Exception as e:
+        return Response(500, body=str(e))

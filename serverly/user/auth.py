@@ -125,8 +125,7 @@ def valid_token(bearer_token: Union[str, BearerToken], expired=True, scope: Unio
     try:
         session = serverly.user._Session()
         if type(bearer_token) == str:
-            token: BearerToken = session.query(
-                BearerToken).filter_by(value=bearer_token).first()
+            token = get_token(bearer_token)
         else:
             token: BearerToken = bearer_token
         if token == None:
@@ -208,6 +207,14 @@ def get_new_token(username: str, scope: Union[str, list] = [], expires: Union[da
 
 
 @serverly.user._setup_required
+def get_token(bearer_token: str):
+    session = serverly.user._Session()
+    token: BearerToken = session.query(
+        BearerToken).filter_by(value=bearer_token).first()
+    return token
+
+
+@serverly.user._setup_required
 def get_all_tokens():
     session = serverly.user._Session()
     result = session.query(BearerToken).all()
@@ -220,5 +227,17 @@ def clear_all_tokens():
     """Delete ALL tokens. Be careful, cause you might break a lot of logins."""
     session = serverly.user._Session()
     session.query(BearerToken).delete()
+    session.commit()
+    session.close()
+
+
+@serverly.user._setup_required
+def clear_token(token: Union[str, BearerToken]):
+    if type(token) == str:
+        token = get_token(token)
+    if token == None:
+        return
+    session = serverly.user._Session()
+    session.delete(token)
     session.commit()
     session.close()

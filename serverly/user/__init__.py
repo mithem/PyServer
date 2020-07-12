@@ -268,6 +268,19 @@ def get(username: str, strict=True):
 
 
 @_setup_required
+def has_role(roles: Union[str, list]) -> bool:
+    """Return bool whether there is at least 1 user with role(s)"""
+    if type(roles) == str:
+        roles = [roles]
+    users = serverly.user.get_all()
+    for u in users:
+        for role in roles:
+            if u.role == role or u.role in _role_hierarchy[u.role]:
+                return True
+    return False
+
+
+@_setup_required
 def get_by_email(email: str, strict=True):
     """Get user with `email`. If `strict` (default), raise UserNotFoundError if user does not exist. Else return None."""
     session = _Session()
