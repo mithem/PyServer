@@ -186,6 +186,7 @@ class MailManager:
         except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError):
             self.pending = []
             self.scheduled = []
+            self._save()
 
     def _save(self):
         try:
@@ -374,6 +375,9 @@ def verify(identifier: str):
                 serverly.logger.success(f"verified email of {username}!")
                 return True
         return False
+    except (FileNotFoundError, json.JSONDecodeError):
+        _set_up_mailmanager_json()
+        verify(identifier)
     except Exception as e:
         serverly.logger.handle_exception(e)
         raise e
@@ -393,6 +397,9 @@ def confirm(identifier: str):
                 serverly.logger.success(f"confirmed email of {username}!")
                 return True
         return False
+    except (FileNotFoundError, json.JSONDecodeError):
+        _set_up_mailmanager_json()
+        confirm(identifier)
     except Exception as e:
         serverly.logger.handle_exception(e)
         raise e
@@ -411,9 +418,21 @@ def reset_password(identifier: str, password: str):
                 serverly.logger.success(f"Changed password of {username}!")
                 return True
         return False
+    except (FileNotFoundError, json.JSONDecodeError):
+        _set_up_mailmanager_json()
+        reset_password(identifier, password)
     except Exception as e:
         serverly.logger.handle_exception(e)
         raise e
+
+
+def _set_up_mailmanager_json():
+    f = open("mailmanager.json", "w+")
+    d = {}
+    for i in _default_special_emails.keys():
+        d[i] = {}
+    json.dump(d, f)
+    f.close()
 
 
 manager: MailManager = None
