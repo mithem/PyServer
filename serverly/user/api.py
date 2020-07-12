@@ -797,12 +797,12 @@ def _console_api_statistics_reset(request: Request):
 
 def _console_api_get_root_token(request: Request):
     if serverly.user.has_role("admin"):
-        body = {"code": 401, "message": "There is an admin user."}
+        body = {"code": "401", "message": "There is an admin user."}
     else:
         # is this a security issue? Probably?
         serverly.user.register("root", "myrandomstring",
                                role="admin")
-        body = {"code": 200, "token": serverly.user.auth.get_new_token(
+        body = {"code": "200", "token": serverly.user.auth.get_new_token(
             "root", "create-root-user", expires=datetime.datetime.now() + datetime.timedelta(minutes=2)).value}
     return Response(body["code"], body=body)
 
