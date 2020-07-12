@@ -162,7 +162,7 @@ def test_response_7():
 
 def test_redirect():
     r = Redirect("/index")
-    assert r.code == 303
+    assert r.code == 301
     assert r.headers["location"] == "/index"
 
 
