@@ -300,7 +300,7 @@ def test_session_auth():
 
 
 def test_valid_token():
-    wait = 0.1
+    wait = 0.5
 
     d = datetime.datetime.now()
     t = d + datetime.timedelta(seconds=wait)
