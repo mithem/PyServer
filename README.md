@@ -1,8 +1,8 @@
 ![pytest](https://github.com/mithem/serverly/workflows/pytest/badge.svg)
 
-# serverly - http.server wrapper and helper
+# serverly
 
-A really simple-to-use HTTP-server!
+A really simple-to-use server framework with integrated user management, built on Uvicorn & SQLAlchemy!
 
 ## Table of Contents
 
