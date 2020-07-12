@@ -18,8 +18,6 @@ class ServerLifespanPlugin(Plugin):
 
 class HeaderPlugin(Plugin):
 
-    description = "A plugin designed to manipulate the headers of every response"
-
     def __init__(self, exceptions=[]):
         self.exceptions = exceptions
 
@@ -27,7 +25,7 @@ class HeaderPlugin(Plugin):
         raise NotImplementedError()
 
 
-class ContentSecurityPolicyHeaderPlugin(HeaderPlugin):
+class Content_Security_PolicyHeaderPlugin(HeaderPlugin):
 
     def __init__(self, policy: str, exceptions=[]):
         super().__init__(exceptions)

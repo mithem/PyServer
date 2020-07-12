@@ -16,6 +16,7 @@ A really simple-to-use HTTP-server!
   - [Resource](#resource)
 - [serverly.user](#serverlyuser)
 - [serverly.statistics](#serverlystatistics)
+- [plugins](#plugins)
 
 ## Configuration
 
@@ -196,3 +197,25 @@ endpoint_performance = {
 ```
 
 Also, it has the functions `new_statistic(function: str, time: float)` and `print_stats()`, both of which you probably don't need 🧐
+
+## plugins
+
+serverly provides a very basic interface for plugins. The following options are available to you to subclass:
+
+- [HeaderPlugin](#headerplugin)
+- [ServerLifespanPlugin](#serverlifespanplugin)
+
+### HeaderPlugin
+
+The `manipulateHeaders(response: Response) -> Response` method gets called of a subclass. It's supposed to alter the headers of the Response just before getting sent to the client. The default implementation raises a NotImplemtedError. The default constructor takes an array of regex patterns, as `str`s, used as exceptions where the plugin will NOT do it's work. There are a few implementations of common `HeaderPlugin`s:
+
+- `Content_Security_PolicyHeaderPlugin(policy: str, exceptions=[])`
+- `X_Frame_OptionsHeaderPlugin(policy: str, exceptions=[])`
+- `X_Content_TypeOptionsHeaderPlugin(policy: str, exceptions=[])`
+
+### ServerLifespanPlugin
+
+The methods of this plugin get called with the lifecycle of the (main) server. Available are:
+
+- `onServerStart()`
+- `onServerShutdown()`
