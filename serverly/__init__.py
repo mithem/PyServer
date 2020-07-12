@@ -241,6 +241,16 @@ class Server:
             self.redirect_server = multiprocessing.Process(
                 target=_https_redirect_server_start, args=tuple([self.redirect_server_port]))
             self.redirect_server.start()
+            for plugin in plugins._plugin_manager.server_lifespan_plugins:
+                try:
+                    plugin.onRedirectServerStart()
+                except NotImplementedError:
+                    logger.warning(
+                        f"Plugin '{plugin.__class__.__name__}' has not implemented a 'onRedirectServerStart' method.")
+                except Exception as e:
+                    logger.warning(
+                        f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onRedirectServerStart'.")
+                    logger.handle_exception(e)
         kwargs = {}
         if ssl_key_file != None:
             kwargs["ssl_keyfile"] = ssl_key_file
@@ -251,6 +261,16 @@ class Server:
         self.close()
 
     def close(self):
+        for plugin in plugins._plugin_manager.server_lifespan_plugins:
+            try:
+                plugin.onServerShuttingDown()
+            except NotImplementedError:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' has not implemented a 'onServerShuttingDown' method.")
+            except Exception as e:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerShuttingDown'.")
+                logger.handle_exception(e)
         logger.context = "shutdown"
         logger.debug("Shutting down server…", True)
         self.redirect_server.terminate()
@@ -527,6 +547,16 @@ def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: st
     """Start the server after applying all relevant attributes like address. `superpath` will replace every occurence of SUPERPATH/ or /SUPERPATH/ with `superpath`. Especially useful for servers orchestrating other servers.
 
     Note: this function will not be 'alive' over the lifespan of the server, it finishes mid-startup."""
+    for plugin in plugins._plugin_manager.server_lifespan_plugins:
+        try:
+            plugin.onServerStartup()
+        except NotImplementedError:
+            logger.warning(
+                f"Plugin '{plugin.__class__.__name__}' has not implemented a 'onServerStartup' method.")
+        except Exception as e:
+            logger.warning(
+                f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerStartup'.")
+            logger.handle_exception(e)
     try:
         logger.verbose = debug
         args = tuple([superpath, debug, ssl_key_file,

@@ -59,7 +59,16 @@ def test_xcto_header_plugin():
 
 def test_server_lifespan_plugin():
     with pytest.raises(NotImplementedError):
+        plugins.ServerLifespanPlugin().onServerStartup()
+
+    with pytest.raises(NotImplementedError):
         plugins.ServerLifespanPlugin().onServerStart()
 
     with pytest.raises(NotImplementedError):
+        plugins.ServerLifespanPlugin().onServerShuttingDown()
+
+    with pytest.raises(NotImplementedError):
         plugins.ServerLifespanPlugin().onServerShutdown()
+
+    with pytest.raises(NotImplementedError):
+        plugins.ServerLifespanPlugin().onRedirectServerStart()

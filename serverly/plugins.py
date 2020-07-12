@@ -9,10 +9,19 @@ class Plugin:
 
 
 class ServerLifespanPlugin(Plugin):
+    def onServerStartup(self):
+        raise NotImplementedError()
+
     def onServerStart(self):
         raise NotImplementedError()
 
+    def onServerShuttingDown(self):
+        raise NotImplementedError()
+
     def onServerShutdown(self):
+        raise NotImplementedError()
+
+    def onRedirectServerStart(self):
         raise NotImplementedError()
 
 
