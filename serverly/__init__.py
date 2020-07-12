@@ -45,6 +45,7 @@ import warnings
 from functools import wraps
 from typing import Union
 
+import serverly.plugins
 import serverly.stater
 import serverly.statistics
 import uvicorn
@@ -52,6 +53,7 @@ from fileloghelper import Logger
 from serverly import default_sites
 from serverly.objects import Request, Response, StaticSite
 from serverly.utils import *
+import serverly.err
 
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
@@ -105,6 +107,26 @@ async def _uvicorn_server(scope, receive, send):
             except serverly.err.UnsupportedHTTPMethod:
                 request = error_response(943)
             func, response = _sitemap.get_content(request)
+
+            new_response = response
+
+            for plugin in serverly.plugins._plugin_manager.header_plugins:
+                try:
+                    for e in plugin.exceptions:
+                        if re.match(e, request.path.path):
+                            raise serverly.err._BrakeException()
+                except serverly.err._BrakeException:
+                    continue
+                try:
+                    new_response = plugin.manipulateHeaders(response)
+                except:
+                    logger.handle_exception(e)
+                    new_response = None
+                if new_response == None:
+                    new_response = response
+                    break
+
+            response = new_response
             response_headers = []
             for k, v in response.headers.items():
                 response_headers.append(
@@ -169,7 +191,7 @@ async def _https_redirect_server(scope, receive, send):
         redir_url = redir_url[1:]
     await send({
         "type": "http.response.start",
-        "status": 303,
+        "status": 301,
         "headers": [[b"location", bytes(redir_url, "utf-8")]]
     })
     await send({
@@ -239,6 +261,16 @@ class Server:
         if callable(self.cleanup_function):
             self.cleanup_function()
         logger.success("Server stopped.")
+        for plugin in plugins._plugin_manager.server_lifespan_plugins:
+            try:
+                plugin.onServerShutdown()
+            except NotImplementedError:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' has not implemented a 'onServerShutdown' method.")
+            except Exception as e:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerShutdown'.")
+                logger.handle_exception(e)
         serverly.statistics.print_stats()
         exit(0)
 
@@ -253,6 +285,16 @@ def _update_status(new_status: str):
         prefix = "https" if _server.ssl_cert_file != None and _server.ssl_key_file != None else "http"
         logger.success(
             f"Server started {prefix}://{address[0]}:{address[1]} with superpath '{_sitemap.superpath}'")
+        for plugin in plugins._plugin_manager.server_lifespan_plugins:
+            try:
+                plugin.onServerStart()
+            except NotImplementedError:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' has not implemented a 'onServerStart' method.")
+            except Exception as e:
+                logger.warning(
+                    f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerStart'.")
+                logger.handle_exception(e)
     elif new_status == "startup.failed" or new_status == "shutdown":
         _server.close()
     elif new_status == "startup.https-red-server-starting":

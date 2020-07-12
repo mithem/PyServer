@@ -20,3 +20,7 @@ class ConfigurationError(Exception):
 
 class UnsupportedHTTPMethod(Exception):
     pass
+
+
+class _BrakeException(Exception):
+    pass

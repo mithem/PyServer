@@ -5,86 +5,13 @@ console_index = r"""<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>serverly admin console</title>
     <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css"/>
-    <style>
-      .summaries  {
-        display: flex;
-      }
-      .summary {
-        padding: 10px;
-        width: 97.5%;
-        margin: 20px auto;
-        border: none;
-        border-radius: 8px;
-        box-shadow: 0px 0px 6px #cccccc;
-      }
-       .summary > a {
-        font-size: larger;
-        font-weight: 600;
-      }
-      @media (prefers-color-scheme: dark){
-        .summary {
-          background-color: #333333;
-          box-shadow: 0px 0px 6px #444444;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/consoleIndex.css"/>
     <script src="SUPERPATH/console/static/js/main.js"></script>
-    <script>
-      function renewLogin(){
-        var req = new XMLHttpRequest();
-        req.open("POST", "SUPERPATH$_console_api_renew_login");
-        req.send('please send WWW-Authenticate header!');
-      }
-      function updateUserSummary() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          if (req.readyState === 4) {
-            if (req.status !== 200) {
-              handleResponse(req);
-            }
-            document.querySelector(
-              ".summaries > .summary#summary-users > p"
-            ).textContent = req.responseText;
-          }
-        };
-        req.open("GET", "SUPERPATH$_console_summary_users");
-        req.send(null);
-      }
-      function updateEndpointSummary() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          if (req.readyState === 4) {
-            if (req.status !== 200) {
-              handleResponse(req);
-            }
-            document.querySelector(
-              ".summaries > .summary#summary-endpoints > p"
-            ).textContent = req.responseText;
-          }
-        };
-        req.open("GET", "SUPERPATH$_console_summary_endpoints");
-        req.send(null);
-      }
-      function updateStatisticsSummary() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          if (req.readyState === 4) {
-            if (req.status !== 200) {
-              handleResponse(req);
-            }
-            document.querySelector(
-              ".summaries > .summary#summary-statistics > p"
-            ).textContent = req.responseText;
-          }
-        };
-        req.open("GET", "SUPERPATH$_console_summary_statistics");
-        req.send(null);
-      }
-    </script>
+    <script src="SUPERPATH/console/static/js/consoleIndex.js"></script>
   </head>
   <body>
     <nav>
-      <a onclick="renewLogin()">serverly admin console</a>
+      <a id="renewLoginBtn">serverly admin console</a>
     </nav>
     <div class="summaries">
       <div class="summary" id="summary-users">
@@ -101,11 +28,7 @@ console_index = r"""<!DOCTYPE html>
       </div>
     </div>
   </body>
-  <script>
-    updateUserSummary();
-    updateEndpointSummary();
-    updateStatisticsSummary();
-  </script>
+  <script src="SUPERPATH/console/static/js/consoleIndexLoaded.js"></script>
 </html>
 """
 
@@ -115,129 +38,10 @@ console_users = r"""<!DOCTYPE html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>serverly admin console</title>
-    <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css">
-    <style>
-      /*
-      .card {
-        scrollbar-color: var(--scrollbar-thumb-color)
-          var(--scrollbar-track-color);
-      }
-      */
-      .tableContainer {
-        height: 500px;
-        overflow: scroll;
-      }
-      table {
-        border-collapse: collapse;
-      }
-      table td,
-      table th {
-        border: 1px solid var(--table-border-color);
-        background-color: var(--table-cell-background-color);
-        text-align: left;
-        padding: 8px;
-      }
-      table tr:nth-child(even) {
-        background-color: var(--table-cell-highlight-color);
-      }
-    </style>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css"/>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/consoleUsers.css"/>
     <script src="SUPERPATH/console/static/js/main.js"></script>
-    <script>
-      function drawUsers(users) {
-        let element = document.querySelector("table#users > tbody");
-        element.innerHTML = "";
-        for (let [attribute, value] of Object.entries(users[0])) {
-          element.innerHTML += "<th>" + attribute + "</th>";
-        }
-        users.forEach((user) => {
-          element.innerHTML += "<tr>";
-          for (let [attribute, value] of Object.entries(user)) {
-            console.debug(attribute + ":" + value);
-            element.innerHTML += "<td>" + value + "</td>";
-          }
-          element.innerHTML += "</tr>";
-        });
-        console.info("refreshed users");
-      }
-      function selectMasterToggled(){
-        let checked = document.querySelector("input#select-master").checked;
-        var users = document.querySelectorAll("input.user-select");
-        for(let user of users){
-          user.checked = checked;
-        }
-      }
-      function getIds(){
-        var users = document.querySelectorAll("input.user-select");
-        var ids = [];
-        for(let user of users){
-          if(user.checked){
-            ids.push(parseInt(user.id.replace("user-", "")));
-          }
-        }
-        return ids;
-      }
-      function change(){
-        var ids = getIds();
-        var url = "SUPERPATH$_console_change_or_create_user?ids=";
-        for(id of ids){
-          url += id + ",";
-        }
-        document.location.href = url;
-      }
-      function verify(){
-        var ids = getIds();
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("POST", "SUPERPATH$_console_api_verify_users");
-        req.send(JSON.stringify(ids));
-      }
-      function deverify(){
-        var ids = getIds();
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("POST", "SUPERPATH$_console_api_deverify_users");
-        req.send(JSON.stringify(ids));
-      }
-      function verimail() {
-        var ids = getIds();
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("POST", "SUPERPATH$_console_api_verimail");
-        req.send(JSON.stringify(ids));
-      }
-      function del(){
-        var ids = getIds();
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("DELETE", "SUPERPATH$_console_api_delete_users");
-        req.send(JSON.stringify(ids));
-      }
-      function resetPassword(){
-        var ids = getIds();
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("DELETE", "SUPERPATH$_console_api_reset_password");
-        req.send(JSON.stringify(ids));
-      }
-      function clearExpiredTokens(){
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("DELETE", "SUPERPATH$_console_api_clear_expired_tokens");
-        req.send(null);
-      }
-    </script>
+    <script src="SUPERPATH/console/static/js/consoleUsers.js"></script>
   </head>
   <body>
     <nav>
@@ -246,13 +50,13 @@ console_users = r"""<!DOCTYPE html>
     <div class="card">
       <span>actions</span>
       <div class="actions">
-        <button class="action" id="change" onclick="change();">change/register</button>
-        <button class="action" id="verify" onclick="verify();">verify</button>
-        <button class="action" id="deverify" onclick="deverify();">deverify</button>
-        <button class="action" id="verimail" onclick="verimail();">verimail</button>
-        <button class="action" id="delete" onclick="del();">delete</button>
-        <button class="action" id="resetPassword" onclick="resetPassword();">reset password</button>
-        <button class="action" id="clearExpiredTokens" onclick="clearExpiredTokens();">clear expired tokens</button>
+        <button class="action" id="btnChange">change/register</button>
+        <button class="action" id="btnVerify">verify</button>
+        <button class="action" id="btnDeverify">deverify</button>
+        <button class="action" id="btnVerimail">verimail</button>
+        <button class="action" id="btnDelete">delete</button>
+        <button class="action" id="btnResetPassword">reset password</button>
+        <button class="action" id="btnClearExpiredTokens">clear expired tokens</button>
       </div>
     </div>
     <div class="card">
@@ -262,9 +66,7 @@ console_users = r"""<!DOCTYPE html>
       </div>
     </div>
   </body>
-  <script>
-    document.querySelector("input#select-master").addEventListener("click", selectMasterToggled);
-  </script>
+  <script src="SUPERPATH/console/static/js/consoleUsersLoaded.js"></script>
 </html>
 """
 
@@ -293,21 +95,6 @@ console_user_change_or_create = r"""<!DOCTYPE html>
         background-color: #efefef;
         padding: 4px;
       }
-      #progressbar {
-        max-width: 300px;
-        width: 80%;
-        margin: 0px auto;
-      }
-      @media (prefers-color-scheme: dark){
-        .card {
-          background-color: #333333;
-        }
-      }
-      .card {
-        min-width: 400px;
-        width: 100%;
-        height: 600px;
-      }
     </style>
   </head>
   <body>
@@ -317,7 +104,6 @@ console_user_change_or_create = r"""<!DOCTYPE html>
     <div class="card" id="card">
       <span>change or register user</span>
       <div id="attributeContainer"></div>
-      <progress id="progressbar" max="1" value="0">0/0</progress>
     </div>
   </body>
       <script>
@@ -420,11 +206,8 @@ console_user_change_or_create = r"""<!DOCTYPE html>
       }
       async function main(){
         let ids = ${user_ids};
-        const progressbar = document.getElementById("progressbar");
-        progressbar.max = ids.length;
         for(var i = 0; i < ids.length; i++){
           userFinished = false;
-          console.info("showing user…"),
           getUser(ids[i], treatUser);
           while(!userFinished){
             await sleep(1000);
@@ -443,147 +226,11 @@ console_endpoints = r"""<!DOCTYPE html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/console/static/css/main.css" />
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css" />
     <title>serverly admin console</title>
     <script src="/console/static/js/main.js"></script>
-    <style>
-      body {
-        overflow-y: scroll;
-      }
-      .method-heading {
-        font-size: 22px;
-        font-weight: 400;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-      }
-      .card {
-        width: 100%;
-        overflow-x: hidden;
-      }
-      table {
-        width: 100%;
-        margin: 5px;
-        text-align: left;
-        border-collapse: collapse;
-      }
-      table th {
-        font-weight: 500;
-        font-style: italic;
-      }
-      table tr:nth-child(even){
-        background-color: var(--table-cell-highlight-color);
-      }
-      .tableContainer {
-        height: 500px;
-        overflow: scroll;
-      }
-      @media screen and (max-width: 750px){
-        .card {
-          overflow-x: scroll;
-        }
-      }
-    </style>
-    <script>
-      function sortOnKeys(dict) {
-        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
-        var sorted = [];
-        for(var key in dict) {
-            sorted[sorted.length] = key;
-        }
-        sorted.sort();
-
-        var tempDict = {};
-        for(var i = 0; i < sorted.length; i++) {
-            tempDict[sorted[i]] = dict[sorted[i]];
-        }
-
-        return tempDict;
-      }
-      function newEndpoint(){
-        let method = prompt("Method?");
-        let path = prompt("Path?");
-        let func = prompt("Function name (from your script)?");
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("POST", "SUPERPATH$_console_api_endpoint_new");
-        req.send(JSON.stringify({method: method, path: path, function: func}))
-      }
-      function deleteEndpoint(){
-        var endpoints = [];
-        for(let methodcard of document.querySelectorAll(".card")){
-          let method = methodcard.id.slice(5);
-          for(let endpoint of document.querySelectorAll("#card-" + method + " tr")){
-            var checked = endpoint.children[0].children[0].checked;
-            try {
-              var path = endpoint.children[1].children[0].textContent;
-              if (checked){
-                endpoints.push([method, path])
-              }
-            }
-            catch { // headers don't have enough children}
-            }
-          }
-        }
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("DELETE", "SUPERPATH$_console_api_endpoint_delete");
-        req.send(JSON.stringify(endpoints));
-      }
-      function toggle(method){
-        method = method.toLowerCase();
-        let checkbox = document.querySelector("#card-" + method + " input.select-master");
-        let checked = checkbox.checked;
-        let endpoints = document.querySelectorAll("#card-" + method + " input.endpoint-select");
-        for(var endpoint of endpoints){
-          endpoint.checked = checked;
-        }
-      }
-      function drawEndpoints(endpoints) {
-        let endpointsContainer = document.getElementById("endpointsContainer");
-        endpointsContainer.innerHTML = "";
-        var result = "";
-        for (let method of Object.keys(endpoints)) {
-          result +=
-            "<div class='card' id='card-" + method + "'><span class='method-heading'>" +
-            method +
-            "</span>";
-          var table =
-            "<table><thead><th><input type='checkbox' class='endpoint-select select-master' onclick=\"toggle('" + method + "')\"></input></th><th>path</th><th>function</th></thead><tbody>";
-          for (let [path, funcname] of Object.entries(sortOnKeys(endpoints[method]))) {
-            path = path.slice(1, -1)
-            table +=
-              "<tr><td><input type='checkbox' class='endpoint-select' id='endpoint-" + path + "'></input></td><td><a href='" +
-              path +
-              "' class='mylink'>" +
-              path +
-              "</a></td><td>" +
-              funcname +
-              "</td></tr>";
-          }
-          result += table + "</tbody></table></div>";
-        }
-        endpointsContainer.innerHTML = result;
-      }
-      function loadEndpoints() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          if (req.readyState === 4) {
-            if (req.status === 200) {
-              console.info(JSON.parse(req.responseText));
-              drawEndpoints(JSON.parse(req.responseText));
-            } else {
-              handleResponse(req);
-            }
-          }
-        };
-        req.open("GET", "SUPERPATH$_console_api_endpoints_get");
-        req.send(null);
-      }
-    </script>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/consoleEndpoints.css"/>
+    <script src="SUPERPATH/console/static/js/consoleEndpoints.js"></script>
   </head>
   <body>
     <nav>
@@ -592,16 +239,14 @@ console_endpoints = r"""<!DOCTYPE html>
     <div class="card">
       <span>actions</span>
       <div class="actions">
-        <button onclick="newEndpoint();">new</button>
-        <button onclick="deleteEndpoint();">delete</button>
-        <button onclick="loadEndpoints();">refresh</button
+        <button id="btnNewEndpoint">new</button>
+        <button id="btnDeleteEndpoints">delete</button>
+        <button id="btnRefresh">refresh</button
       </div>
     </div>
     <div id="endpointsContainer"></div>
   </body>
-  <script>
-    loadEndpoints();
-  </script>
+  <script src="SUPERPATH/console/static/js/consoleEndpointsLoaded.js"></script>
 </html>
 """
 
@@ -609,94 +254,12 @@ console_statistics = r"""<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/console/static/css/main.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/main.css"/>
+    <link rel="stylesheet" href="SUPERPATH/console/static/css/consoleStatistics.css"/>
     <title>serverly admin console</title>
-    <script src="/console/static/js/main.js"></script>
-    <style>
-      body {
-        overflow-y: scroll;
-      }
-      .method-heading {
-        font-size: 22px;
-        font-weight: 400;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-      }
-      .card {
-        width: 100%;
-        overflow-x: hidden;
-      }
-      table {
-        width: 100%;
-        margin: 5px;
-        text-align: left;
-        border-collapse: collapse;
-      }
-      table th {
-        font-weight: 500;
-        font-style: italic;
-      }
-      table tr:nth-child(even){
-        background-color: var(--table-cell-highlight-color);
-      }
-      .tableContainer {
-        height: 500px;
-        overflow: scroll;
-      }
-      @media screen and (max-width: 750px){
-        .card {
-          overflow-x: scroll;
-        }
-      }
-    </style>
-    <script>
-      function sortOnKeys(dict) {
-        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
-        var sorted = [];
-        for(var key in dict) {
-            sorted[sorted.length] = key;
-        }
-        sorted.sort();
-
-        var tempDict = {};
-        for(var i = 0; i < sorted.length; i++) {
-            tempDict[sorted[i]] = dict[sorted[i]];
-        }
-
-        return tempDict;
-      }
-      function drawStatistics(stats) {
-        let table = document.getElementById("statsTable");
-        var result = "";
-        for(let [func, data] of Object.entries(sortOnKeys(stats))){
-          result += "<tr><td>" + func + "</td><td>" + data.mean.toFixed(3) + "</td><td>" + data.min.toFixed(3) + "</td><td>" + data.max.toFixed(3) + "</td><td>" + data.len + "</td></tr>";
-        }
-        table.innerHTML = result;
-      }
-      function loadStats() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          if (req.readyState === 4) {
-            if (req.status === 200) {
-              drawStatistics(JSON.parse(req.responseText));
-            } else {
-              handleResponse(req);
-            }
-          }
-        };
-        req.open("GET", "SUPERPATH$_console_api_statistics_get");
-        req.send(null);
-      }
-      function resetStatistics() {
-        var req = new XMLHttpRequest();
-        req.onreadystatechange = () => {
-          handleResponse(req);
-        }
-        req.open("DELETE", "SUPERPATH$_console_api_statistics_reset");
-        req.send(null);
-      }
-    </script>
+    <script src="SUPERPATH/console/static/js/main.js"></script>
+    <script src="SUPERPATH/console/static/js/consoleStatistics.js"></script>
   </head>
   <body>
     <nav>
@@ -705,8 +268,8 @@ console_statistics = r"""<!DOCTYPE html>
     <div class="card">
       <span>actions</span>
       <div class="actions">
-        <button onclick="resetStatistics()">reset</button>
-        <button onclick="loadStats();">refresh</button>
+        <button id="btnReset">reset</button>
+        <button id="btnRefresh">refresh</button>
       </div>
     </div>
     <div class="card" id="statsContainer">
@@ -725,9 +288,7 @@ console_statistics = r"""<!DOCTYPE html>
       </table>
     </div>
   </body>
-  <script>
-    loadStats();
-  </script>
+  <script src="SUPERPATH/console/static/js/consoleStatisticsLoaded.js"></script>
 </html>
 """
 
@@ -846,3 +407,451 @@ console_css_main = """body {
         }
       }
   """
+
+console_index_js_main = """function renewLogin() {
+    var req = new XMLHttpRequest();
+    req.open("POST", "SUPERPATH$_console_api_renew_login");
+    req.send('please send WWW-Authenticate header!');
+}
+
+function updateUserSummary() {
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = () => {
+        if (req.readyState === 4) {
+            if (req.status !== 200) {
+                handleResponse(req);
+            }
+            document.querySelector(
+                ".summaries > .summary#summary-users > p"
+            ).textContent = req.responseText;
+        }
+    };
+    req.open("GET", "SUPERPATH$_console_summary_users");
+    req.send(null);
+}
+
+function updateEndpointSummary() {
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = () => {
+        if (req.readyState === 4) {
+            if (req.status !== 200) {
+                handleResponse(req);
+            }
+            document.querySelector(
+                ".summaries > .summary#summary-endpoints > p"
+            ).textContent = req.responseText;
+        }
+    };
+    req.open("GET", "SUPERPATH$_console_summary_endpoints");
+    req.send(null);
+}
+
+function updateStatisticsSummary() {
+    var req = new XMLHttpRequest();
+    req.onreadystatechange = () => {
+        if (req.readyState === 4) {
+            if (req.status !== 200) {
+                handleResponse(req);
+            }
+            document.querySelector(
+                ".summaries > .summary#summary-statistics > p"
+            ).textContent = req.responseText;
+        }
+    };
+    req.open("GET", "SUPERPATH$_console_summary_statistics");
+    req.send(null);
+}
+"""
+
+console_index_js_loaded = """document.getElementById("renewLoginBtn").onclick = renewLogin;
+updateUserSummary();
+updateEndpointSummary();
+updateStatisticsSummary();
+"""
+
+console_index_css = """.summaries  {
+        display: flex;
+      }
+      .summary {
+        padding: 10px;
+        width: 97.5%;
+        margin: 20px auto;
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0px 0px 6px #cccccc;
+      }
+       .summary > a {
+        font-size: larger;
+        font-weight: 600;
+      }
+      @media (prefers-color-scheme: dark){
+        .summary {
+          background-color: #333333;
+          box-shadow: 0px 0px 6px #444444;
+        }
+      }
+"""
+
+console_users_css = """.tableContainer {
+        height: 500px;
+        overflow: scroll;
+      }
+      table {
+        border-collapse: collapse;
+      }
+      table td,
+      table th {
+        border: 1px solid var(--table-border-color);
+        background-color: var(--table-cell-background-color);
+        text-align: left;
+        padding: 8px;
+      }
+      table tr:nth-child(even) {
+        background-color: var(--table-cell-highlight-color);
+      }
+"""
+
+console_users_js = """function drawUsers(users) {
+        let element = document.querySelector("table#users > tbody");
+        element.innerHTML = "";
+        for (let [attribute, value] of Object.entries(users[0])) {
+          element.innerHTML += "<th>" + attribute + "</th>";
+        }
+        users.forEach((user) => {
+          element.innerHTML += "<tr>";
+          for (let [attribute, value] of Object.entries(user)) {
+            console.debug(attribute + ":" + value);
+            element.innerHTML += "<td>" + value + "</td>";
+          }
+          element.innerHTML += "</tr>";
+        });
+        console.info("refreshed users");
+      }
+      function selectMasterToggled() {
+        let checked = document.querySelector("input#select-master").checked;
+        var users = document.querySelectorAll("input.user-select");
+        for(let user of users){
+          user.checked = checked;
+        }
+      }
+      function getIds() {
+        var users = document.querySelectorAll("input.user-select");
+        var ids = [];
+        for(let user of users){
+          if(user.checked){
+            ids.push(parseInt(user.id.replace("user-", "")));
+          }
+        }
+        return ids;
+      }
+      function change() {
+        var ids = getIds();
+        var url = "SUPERPATH$_console_change_or_create_user?ids=";
+        for(id of ids){
+          url += id + ",";
+        }
+        document.location.href = url;
+      }
+      function verify() {
+        var ids = getIds();
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("POST", "SUPERPATH$_console_api_verify_users");
+        req.send(JSON.stringify(ids));
+      }
+      function deverify() {
+        var ids = getIds();
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("POST", "SUPERPATH$_console_api_deverify_users");
+        req.send(JSON.stringify(ids));
+      }
+      function verimail() {
+        var ids = getIds();
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("POST", "SUPERPATH$_console_api_verimail");
+        req.send(JSON.stringify(ids));
+      }
+      function deleteUsers() {
+        var ids = getIds();
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_delete_users");
+        req.send(JSON.stringify(ids));
+      }
+      function resetPassword() {
+        var ids = getIds();
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_reset_password");
+        req.send(JSON.stringify(ids));
+      }
+      function clearExpiredTokens() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_clear_expired_tokens");
+        req.send(null);
+      }
+"""
+
+console_users_js_loaded = """document.querySelector("input#select-master").addEventListener("click", selectMasterToggled);
+document.getElementById("btnChange").addEventListener("click", change);
+document.getElementById("btnVerify").onclick = verify;
+document.getElementById("btnDeverify").onclick = deverify;
+document.getElementById("btnVerimail").onclick = verimail;
+document.getElementById("btnDelete").onclick = deleteUsers;
+document.getElementById("btnResetPassword").onclick = resetPassword;
+document.getElementById("btnClearExpiredTokens").onclick = clearExpiredTokens;
+"""
+
+console_endpoints_css = """body {
+        overflow-y: scroll;
+      }
+      .method-heading {
+        font-size: 22px;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+      .card {
+        width: 100%;
+        overflow-x: hidden;
+      }
+      table {
+        width: 100%;
+        margin: 5px;
+        text-align: left;
+        border-collapse: collapse;
+      }
+      table th {
+        font-weight: 500;
+        font-style: italic;
+      }
+      table tr:nth-child(even){
+        background-color: var(--table-cell-highlight-color);
+      }
+      .tableContainer {
+        height: 500px;
+        overflow: scroll;
+      }
+      @media screen and (max-width: 750px){
+        .card {
+          overflow-x: scroll;
+        }
+      }
+"""
+
+console_endpoints_js = """function sortOnKeys(dict) {
+        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
+        var sorted = [];
+        for(var key in dict) {
+            sorted[sorted.length] = key;
+        }
+        sorted.sort();
+
+        var tempDict = {};
+        for(var i = 0; i < sorted.length; i++) {
+            tempDict[sorted[i]] = dict[sorted[i]];
+        }
+
+        return tempDict;
+      }
+      function newEndpoint(){
+        let method = prompt("Method?");
+        let path = prompt("Path?");
+        let func = prompt("Function name (from your script)?");
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("POST", "SUPERPATH$_console_api_endpoint_new");
+        req.send(JSON.stringify({method: method, path: path, function: func}))
+      }
+      function deleteEndpoint(){
+        var endpoints = [];
+        for(let methodcard of document.querySelectorAll(".card")){
+          let method = methodcard.id.slice(5);
+          for(let endpoint of document.querySelectorAll("#card-" + method + " tr")){
+            var checked = endpoint.children[0].children[0].checked;
+            try {
+              var path = endpoint.children[1].children[0].textContent;
+              if (checked){
+                endpoints.push([method, path])
+              }
+            }
+            catch { // headers don't have enough children}
+            }
+          }
+        }
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_endpoint_delete");
+        req.send(JSON.stringify(endpoints));
+      }
+      function toggle(method){
+        method = method.toLowerCase();
+        let checkbox = document.querySelector("#card-" + method + " input.select-master");
+        let checked = checkbox.checked;
+        let endpoints = document.querySelectorAll("#card-" + method + " input.endpoint-select");
+        for(var endpoint of endpoints){
+          endpoint.checked = checked;
+        }
+      }
+      function drawEndpoints(endpoints) {
+        let endpointsContainer = document.getElementById("endpointsContainer");
+        endpointsContainer.innerHTML = "";
+        var result = "";
+        for (let method of Object.keys(endpoints)) {
+          result +=
+            "<div class='card' id='card-" + method + "'><span class='method-heading'>" +
+            method +
+            "</span>";
+          var table =
+            "<table><thead><th><input type='checkbox' id='endpoint-select-master-" + method + "' class='endpoint-select select-master'></input></th><th>path</th><th>function</th></thead><tbody>";
+          for (let [path, funcname] of Object.entries(sortOnKeys(endpoints[method]))) {
+            path = path.slice(1, -1)
+            table +=
+              "<tr><td><input type='checkbox' class='endpoint-select' id='endpoint-" + path + "'></input></td><td><a href='" +
+              path +
+              "' class='mylink'>" +
+              path +
+              "</a></td><td>" +
+              funcname +
+              "</td></tr>";
+          }
+          result += table + "</tbody></table></div>";
+        }
+        endpointsContainer.innerHTML = result;
+        for(let method of Object.keys(endpoints)) {
+          document.getElementById("endpoint-select-master-" + method).onclick = () => {
+            toggle(method)
+          }
+        }
+      }
+      function loadEndpoints() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status === 200) {
+              drawEndpoints(JSON.parse(req.responseText));
+            } else {
+              handleResponse(req);
+            }
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_api_endpoints_get");
+        req.send(null);
+      }
+"""
+
+console_endpoints_js_loaded = """loadEndpoints();
+document.getElementById("btnNewEndpoint").onclick = newEndpoint;
+document.getElementById("btnDeleteEndpoints").onclick = deleteEndpoint;
+document.getElementById("btnRefresh").onclick = loadEndpoints;
+"""
+
+console_statistics_js = """function sortOnKeys(dict) {
+        // https://stackoverflow.com/questions/10946880/sort-a-dictionary-or-whatever-key-value-data-structure-in-js-on-word-number-ke
+        var sorted = [];
+        for(var key in dict) {
+            sorted[sorted.length] = key;
+        }
+        sorted.sort();
+
+        var tempDict = {};
+        for(var i = 0; i < sorted.length; i++) {
+            tempDict[sorted[i]] = dict[sorted[i]];
+        }
+
+        return tempDict;
+      }
+      function drawStatistics(stats) {
+        let table = document.getElementById("statsTable");
+        var result = "";
+        for(let [func, data] of Object.entries(sortOnKeys(stats))){
+          result += "<tr><td>" + func + "</td><td>" + data.mean.toFixed(3) + "</td><td>" + data.min.toFixed(
+              3) + "</td><td>" + data.max.toFixed(3) + "</td><td>" + data.len + "</td></tr>";
+        }
+        table.innerHTML = result;
+      }
+      function loadStats() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          if (req.readyState === 4) {
+            if (req.status === 200) {
+              drawStatistics(JSON.parse(req.responseText));
+            } else {
+              handleResponse(req);
+            }
+          }
+        };
+        req.open("GET", "SUPERPATH$_console_api_statistics_get");
+        req.send(null);
+      }
+      function resetStatistics() {
+        var req = new XMLHttpRequest();
+        req.onreadystatechange = () => {
+          handleResponse(req);
+        }
+        req.open("DELETE", "SUPERPATH$_console_api_statistics_reset");
+        req.send(null);
+      }
+      
+"""
+
+console_statistics_js_loaded = """loadStats();
+document.getElementById("btnReset").onclick = resetStatistics;
+document.getElementById("btnRefresh").onclick = loadStats;
+"""
+
+console_statistics_css = """body {
+        overflow-y: scroll;
+      }
+      .method-heading {
+        font-size: 22px;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+      .card {
+        width: 100%;
+        overflow-x: hidden;
+      }
+      table {
+        width: 100%;
+        margin: 5px;
+        text-align: left;
+        border-collapse: collapse;
+      }
+      table th {
+        font-weight: 500;
+        font-style: italic;
+      }
+      table tr:nth-child(even){
+        background-color: var(--table-cell-highlight-color);
+      }
+      .tableContainer {
+        height: 500px;
+        overflow: scroll;
+      }
+      @media screen and (max-width: 750px){
+        .card {
+          overflow-x: scroll;
+        }
+      }
+"""

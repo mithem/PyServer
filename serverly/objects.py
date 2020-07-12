@@ -206,7 +206,7 @@ class Response(CommunicationObject):
 class Redirect(Response):
     """Behaves like a Response object. Return it to redirect client to path. If required, you can change the code from 303 - See other (GET only) to whatever you like (might not redirect of course)."""
 
-    def __init__(self, path: str, code=303, **extra_headers):
+    def __init__(self, path: str, code=301, **extra_headers):
         super().__init__(code, {"location": path, **extra_headers})
 
 

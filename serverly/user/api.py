@@ -125,6 +125,9 @@ def use(function: str, method: str, path: str):
         serverly._sitemap.register_site(method, func, path)
         _reversed_api[func.__name__] = path
 
+    if function.startswith("console.") and not function.startswith("console.api"):
+        _serve_console_static_files()
+
 
 def setup(mail_verification=False, require_user_to_be_verified=False, use_sessions_when_client_calls_endpoint=False, fixed_user_attributes=[], bearer_tokens_allow_api_to_set_expired=False, bearer_tokens_expire_after_minutes=30):
     """Some configuration of the standard API.
@@ -269,10 +272,22 @@ def _api_bearer_clear(request: Request):
     return Response(body=f"Deleted {n} expired tokens.")
 
 
-def _serve_console_static_files(func):
+def _serve_console_static_files():
     required_files = {
         "^/console/static/css/main.css$": serverly.default_sites.console_css_main,
-        "^/console/static/js/main.js$": serverly.default_sites.console_js_main
+        "^/console/static/js/main.js$": serverly.default_sites.console_js_main,
+        "^/console/static/js/consoleIndex.js$": serverly.default_sites.console_index_js_main,
+        "^/console/static/js/consoleIndexLoaded.js$": serverly.default_sites.console_index_js_loaded,
+        "^/console/static/css/consoleIndex.css$": serverly.default_sites.console_index_css,
+        "^/console/static/js/consoleUsers.js$": serverly.default_sites.console_users_js,
+        "^/console/static/js/consoleUsersLoaded.js$": serverly.default_sites.console_users_js_loaded,
+        "^/console/static/css/consoleUsers.css$": serverly.default_sites.console_users_css,
+        "^/console/static/js/consoleEndpoints.js$": serverly.default_sites.console_endpoints_js,
+        "^/console/static/js/consoleEndpointsLoaded.js$": serverly.default_sites.console_endpoints_js_loaded,
+        "^/console/static/css/consoleEndpoints.css$": serverly.default_sites.console_endpoints_css,
+        "^/console/static/js/consoleStatistics.js$": serverly.default_sites.console_statistics_js,
+        "^/console/static/js/consoleStatisticsLoaded.js$": serverly.default_sites.console_statistics_js_loaded,
+        "^/console/static/css/consoleStatistics.css$": serverly.default_sites.console_statistics_css
     }
     for path in required_files.keys():
         os.makedirs("/".join(path[2:-1].split("/")[:-1]), exist_ok=True)
@@ -280,16 +295,10 @@ def _serve_console_static_files(func):
         if serverly._sitemap.methods["get"].get(path, "no") == "no":
             fpath = path[2:-1]
             with open(fpath, "w+") as f:
-                f.write(content)
+                f.write(_get_content(content))
             serverly.static_page(fpath, path)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
 
-
-@_serve_console_static_files
 def _console_index(request: Request):
     def regular():
         content = _get_content(serverly.default_sites.console_index)
@@ -315,7 +324,6 @@ def _console_index(request: Request):
         return Response(body=f"<html><head><meta charset='UFT-8'/></head><body><p>Created root user. Password: {password}</p></body></html>")
 
 
-@_serve_console_static_files
 @basic_auth
 @_check_to_use_sessions
 @requires_role("admin")
@@ -336,7 +344,6 @@ def _console_users(request: Request):
     return Response(body=content)
 
 
-@_serve_console_static_files
 @basic_auth
 @_check_to_use_sessions
 @requires_role("admin")
