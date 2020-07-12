@@ -119,7 +119,7 @@ async def _uvicorn_server(scope, receive, send):
                     continue
                 try:
                     new_response = plugin.manipulateHeaders(response)
-                except:
+                except Exception as e:
                     logger.handle_exception(e)
                     new_response = None
                 if new_response == None:
