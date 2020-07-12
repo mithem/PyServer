@@ -76,7 +76,7 @@ def test_server():
 
     p.start()
 
-    time.sleep(0.5)
+    time.sleep(5)
 
     evaluate()
 
