@@ -724,7 +724,7 @@ def _console_api_renew_login(request: Request):
             assert "hello" == "world", "oh yeah!"
         assert request.auth_type.lower() == "basic"
         user = serverly.user.get(request.user_cred[0])
-        assert user.role == "admin"
+        assert user.role == "admin" or "admin" in serverly.user._role_hierarchy[user.role]
         serverly.user.authenticate(user.username, request.user_cred[1], True)
         return Response()
     except (AssertionError, serverly.err.UserNotFoundError, AttributeError, TypeError, serverly.err.NotAuthorizedError):

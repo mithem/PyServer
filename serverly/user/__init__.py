@@ -275,7 +275,7 @@ def has_role(roles: Union[str, list]) -> bool:
     users = serverly.user.get_all()
     for u in users:
         for role in roles:
-            if u.role == role or u.role in _role_hierarchy[u.role]:
+            if u.role == role or role in _role_hierarchy[u.role]:
                 return True
     return False
 
