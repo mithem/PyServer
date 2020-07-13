@@ -58,7 +58,7 @@ import serverly.err
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
 name = "serverly"
-version = "0.4.5"
+version = "0.4.6"
 logger = Logger("serverly.log", "serverly", False, True)
 logger.header(True, True, description, fileloghelper_version=True,
               program_version="serverly v" + version)
