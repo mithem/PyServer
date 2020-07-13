@@ -106,9 +106,7 @@ def session_auth(scope: Union[str, list]):
             try:
                 last_session = serverly.user.session.get_last_session(
                     request.user.username)
-                print(last_session.end)
                 d = datetime.datetime.now()
-                print(d)
                 if last_session.end + datetime.timedelta(seconds=serverly.user.session_renew_threshold) < d:
                     return Response(401, body=unauth_res)
             except Exception as e:

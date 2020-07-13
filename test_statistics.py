@@ -56,7 +56,7 @@ def test_print_stats(capsys):
     serverly.statistics.reset()
     serverly.statistics.print_stats()
     out, err = capsys.readouterr()
-    print(out, err)
+
     sys.stdout.write(out)
     sys.stderr.write(err)
     assert "No statistics." in out

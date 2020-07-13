@@ -798,13 +798,14 @@ def _console_api_statistics_reset(request: Request):
 def _console_api_get_root_token(request: Request):
     if serverly.user.has_role("admin"):
         body = {"code": "401", "message": "There is an admin user."}
+        return Response(406, body=body)
     else:
         # is this a security issue? Probably?
-        serverly.user.register("root", "myrandomstring",
+        serverly.user.register("root", "root1234",
                                role="admin")
         body = {"code": "200", "token": serverly.user.auth.get_new_token(
             "root", "create-root-user", expires=datetime.datetime.now() + datetime.timedelta(minutes=2)).value}
-    return Response(body["code"], body=body)
+        return Response(200, body=body)
 
 
 @bearer_auth("create-root-user")
@@ -816,7 +817,7 @@ def _console_api_create_root_user(request: Request):
         serverly.user.change("root", password=request.obj["password"])
         for token in serverly.user.auth.get_tokens_by_user("root"):
             serverly.user.auth.clear_token(token)
-        return Response(body="Created root user successfully.")
+        return Response(body="Changed root user successfully.")
     except KeyError:
         return Response(406, body="Expected password.")
     except Exception as e:
