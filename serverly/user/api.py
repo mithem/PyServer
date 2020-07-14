@@ -140,7 +140,7 @@ def setup(mail_verification=False, require_user_to_be_verified=False, use_sessio
     - | -
     mail_verification | Send verification mail to user when calling the register API endpoint. You can do that manually by calling `serverly.user.mail.send_verification_email()`
     require_user_to_be_verified | Users will only be authorized if their email is verified
-    use_sessions_when_client_calls_endpoint | Register a new user activity whenever an endpoint is called (`serverly.user.new_activity()`)
+    use_sessions_when_client_calls_endpoint | Register a new user activity whenever an endpoint is called (`serverly.user.session.new_activity()`)
     fixed_user_attributes | Attribute names of users which may not be changed via the API. Useful for roles or other important data the client may not change.
     bearer_tokens_allow_api_to_set_expired | Allow the API to set the expire-date for bearer tokens. Otherwise `bearer_tokens_expire_after_minutes` will be used.
     bearer_tokens_expire_after_minutes | Amount (int) of minutes after which BearerTokens expire by default (if not `bearer_tokens_allow_api_to_set_expired`)
@@ -203,7 +203,7 @@ def _api_register(req: Request):  # cannot use _check_to_use_sessions as it need
     try:
         serverly.user.register(**req.obj)
         response = Response()
-        serverly.user.new_activity(req.obj["username"], req.address)
+        serverly.user.session.new_activity(req.obj["username"], req.address)
         if verify_mail:
             serverly.user.mail.manager.schedule_verification_mail(
                 req.obj["username"])
@@ -220,7 +220,7 @@ def _api_register(req: Request):  # cannot use _check_to_use_sessions as it need
 
 @basic_auth
 def _api_sessions_post(req: Request):
-    serverly.user.new_activity(req.user.username, req.address)
+    serverly.user.session.new_activity(req.user.username, req.address)
     return Response()
 
 
