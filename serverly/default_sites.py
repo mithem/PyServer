@@ -82,6 +82,7 @@ console_user_change_or_create = r"""<!DOCTYPE html>
       #attributeContainer {
         display: grid;
         grid-template-columns: auto auto auto;
+        margin: 15px;
       }
       .field {
         text-align: right;
@@ -94,6 +95,14 @@ console_user_change_or_create = r"""<!DOCTYPE html>
         border: none;
         background-color: #efefef;
         padding: 4px;
+      }
+      .card > button#apply {
+        margin: 20px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .field > input {
+          background-color: #777;
+        }
       }
     </style>
   </head>
