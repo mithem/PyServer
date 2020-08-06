@@ -1,4 +1,4 @@
-![pytest](https://github.com/mithem/serverly/workflows/pytest/badge.svg)
+![pytest](https://github.com/mithem/serverly/workflows/pytest/badge.svg) ![CodeQL Analysis](https://github.com/mithem/serverly/workflows/CodeQL%20Analysis/badge.svg)
 
 # serverly
 
