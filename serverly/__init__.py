@@ -38,6 +38,7 @@ This will return "Hello World!" with a status code of 200, as plain text to the 
 
 import importlib
 import multiprocessing
+import os
 import re
 import time
 import urllib.parse as parse
@@ -45,6 +46,7 @@ import warnings
 from functools import wraps
 from typing import Union
 
+import serverly.err
 import serverly.plugins
 import serverly.stater
 import serverly.statistics
@@ -53,7 +55,6 @@ from fileloghelper import Logger
 from serverly import default_sites
 from serverly.objects import Request, Response, StaticSite
 from serverly.utils import *
-import serverly.err
 
 description = "A really simple-to-use HTTP-server"
 address = ("localhost", 8080)
@@ -316,7 +317,15 @@ def _update_status(new_status: str):
                     f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerStart'.")
                 logger.handle_exception(e)
     elif new_status == "startup.failed" or new_status == "shutdown":
-        _server.close()
+        try:
+            _server.close()
+        except AttributeError:
+            if new_status == "startup.failed":
+                logger.error("Startup failed. Server shut down.")
+            else:
+                logger.warning(f"Error shutting down server: {str(e)}")
+        except Exception as e:
+            logger.warning(f"Error shutting down server: {str(e)}")
     elif new_status == "startup.https-red-server-starting":
         logger.context = "startup"
         logger.success(
@@ -557,6 +566,25 @@ def start(superpath: str = '/', mail_active=False, debug=False, ssl_key_file: st
             logger.warning(
                 f"Plugin '{plugin.__class__.__name__}' raised the following exception in 'onServerStartup'.")
             logger.handle_exception(e)
+    
+    cert_valid = True
+    if ssl_key_file != None and not os.path.isfile(ssl_key_file):
+        try:
+            raise err.ConfigurationError(f"'ssl_key_file' ({ssl_key_file}) not found.")
+        except Exception as e:
+            logger.handle_exception(e)
+        cert_valid = False
+    if ssl_cert_file != None and not os.path.isfile(ssl_cert_file):
+        try:
+            raise err.ConfigurationError(f"'ssl_cert_file' ({ssl_cert_file}) not found.")
+        except Exception as e:
+            logger.handle_exception(e)
+        cert_valid = False
+    if not cert_valid:
+        logger.error("At least one certificate-related file not found. Aborting startup.")
+        _update_status("startup.failed")
+        return
+    
     try:
         logger.verbose = debug
         args = tuple([superpath, debug, ssl_key_file,
